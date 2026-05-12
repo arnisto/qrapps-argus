@@ -144,6 +144,7 @@ See [docs/OPEN_SOURCE_STRATEGY.md](./docs/OPEN_SOURCE_STRATEGY.md).
 - [STRATEGY.md](./docs/STRATEGY.md) — wedge, moat, GTM, 90-day MVP, risks
 - [ARCHITECTURE.md](./docs/ARCHITECTURE.md) — current v0.1 system design
 - [ARCHITECTURE_TARGET.md](./docs/ARCHITECTURE_TARGET.md) — target three-plane architecture (north star)
+- [AGENT_LOOPS.md](./docs/AGENT_LOOPS.md) — four-loop agent runtime, auto-correction, budgeting
 - [MVP_SCOPE.md](./docs/MVP_SCOPE.md) — what ships in v0.1
 - [ROADMAP.md](./docs/ROADMAP.md) — what's next
 - [INVESTIGATORS.md](./docs/INVESTIGATORS.md) — how to write an investigator
