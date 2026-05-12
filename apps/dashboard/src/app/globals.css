@@ -1,0 +1,417 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===========================================================================
+ * Argus design tokens — mirror tailwind.config.ts. Made available as CSS vars
+ * so non-utility code (SVG fills, color-mix calls, raw style props) can use
+ * the same palette without hard-coding hex/oklch.
+ * =========================================================================*/
+:root {
+  color-scheme: dark;
+
+  --bg-0: oklch(0.135 0.008 250);
+  --bg-1: oklch(0.165 0.009 250);
+  --bg-2: oklch(0.195 0.010 250);
+  --bg-3: oklch(0.225 0.011 250);
+  --line: oklch(0.265 0.012 250);
+  --line-strong: oklch(0.32 0.013 250);
+  --fg-0: oklch(0.97 0.004 250);
+  --fg-1: oklch(0.82 0.006 250);
+  --fg-2: oklch(0.62 0.008 250);
+  --fg-3: oklch(0.46 0.010 250);
+
+  --blue:    oklch(0.72 0.16 250);
+  --blue-d:  oklch(0.52 0.16 250);
+  --emerald: oklch(0.72 0.15 158);
+  --amber:   oklch(0.78 0.14 78);
+  --rose:    oklch(0.68 0.18 22);
+
+  --radius:    10px;
+  --radius-sm: 6px;
+}
+
+html,
+body {
+  background: var(--bg-0);
+  color: var(--fg-0);
+  font-family: 'Geist', system-ui, sans-serif;
+  font-feature-settings: 'ss01', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  /* The signature aurora wash from the design — fixed to the viewport so it
+   * lights the whole app, not just one screen. */
+  background-image:
+    radial-gradient(900px 400px at 12% -10%, oklch(0.72 0.16 250 / 0.07), transparent 60%),
+    radial-gradient(700px 350px at 110% 5%, oklch(0.72 0.15 158 / 0.04), transparent 55%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background-color: oklch(0.72 0.16 250 / 0.25);
+}
+
+/* Mono utility helper — Geist Mono with the same feature settings */
+.mono,
+.font-mono {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-feature-settings: 'ss01';
+}
+
+/* ===========================================================================
+ * Design-system primitives reused across screens. Each maps 1:1 to a class
+ * from the design source so designs translate directly.
+ * =========================================================================*/
+
+/* ---- chip ---- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  color: var(--fg-1);
+  font-size: 11px;
+}
+.chip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fg-3);
+}
+.chip.blue {
+  color: var(--blue);
+  border-color: color-mix(in oklch, var(--blue) 35%, var(--line));
+  background: color-mix(in oklch, var(--blue) 8%, var(--bg-2));
+}
+.chip.blue .dot {
+  background: var(--blue);
+}
+.chip.emerald {
+  color: var(--emerald);
+  border-color: color-mix(in oklch, var(--emerald) 35%, var(--line));
+  background: color-mix(in oklch, var(--emerald) 8%, var(--bg-2));
+}
+.chip.emerald .dot {
+  background: var(--emerald);
+}
+.chip.amber {
+  color: var(--amber);
+  border-color: color-mix(in oklch, var(--amber) 35%, var(--line));
+  background: color-mix(in oklch, var(--amber) 8%, var(--bg-2));
+}
+.chip.amber .dot {
+  background: var(--amber);
+}
+.chip.rose {
+  color: var(--rose);
+  border-color: color-mix(in oklch, var(--rose) 35%, var(--line));
+  background: color-mix(in oklch, var(--rose) 8%, var(--bg-2));
+}
+.chip.rose .dot {
+  background: var(--rose);
+}
+
+/* ---- agent badge (round avatar) ---- */
+.ag {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 10px/1 'Geist Mono', monospace;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  color: var(--fg-1);
+}
+.ag.blue {
+  background: color-mix(in oklch, var(--blue) 16%, var(--bg-2));
+  border-color: color-mix(in oklch, var(--blue) 45%, var(--line));
+  color: var(--blue);
+}
+.ag.emerald {
+  background: color-mix(in oklch, var(--emerald) 16%, var(--bg-2));
+  border-color: color-mix(in oklch, var(--emerald) 45%, var(--line));
+  color: var(--emerald);
+}
+.ag.amber {
+  background: color-mix(in oklch, var(--amber) 16%, var(--bg-2));
+  border-color: color-mix(in oklch, var(--amber) 45%, var(--line));
+  color: var(--amber);
+}
+.ag.rose {
+  background: color-mix(in oklch, var(--rose) 16%, var(--bg-2));
+  border-color: color-mix(in oklch, var(--rose) 45%, var(--line));
+  color: var(--rose);
+}
+
+/* ---- buttons ---- */
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  color: var(--fg-0);
+  font: 500 12.5px/1 'Geist', sans-serif;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.ds-btn:hover {
+  background: var(--bg-3);
+  border-color: var(--line-strong);
+}
+.ds-btn.sm {
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+.ds-btn.lg {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+.ds-btn.primary {
+  background: color-mix(in oklch, var(--blue) 18%, var(--bg-2));
+  border-color: color-mix(in oklch, var(--blue) 50%, var(--line));
+}
+.ds-btn.primary:hover {
+  background: color-mix(in oklch, var(--blue) 28%, var(--bg-2));
+}
+.ds-btn.success {
+  background: color-mix(in oklch, var(--emerald) 18%, var(--bg-2));
+  border-color: color-mix(in oklch, var(--emerald) 50%, var(--line));
+}
+.ds-btn.success:hover {
+  background: color-mix(in oklch, var(--emerald) 28%, var(--bg-2));
+}
+.ds-btn.danger {
+  background: color-mix(in oklch, var(--rose) 18%, var(--bg-2));
+  border-color: color-mix(in oklch, var(--rose) 50%, var(--line));
+}
+.ds-btn.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-1);
+}
+.ds-btn.ghost:hover {
+  background: var(--bg-2);
+}
+
+/* ---- card ---- */
+.ds-card {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.ds-card-hd {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(180deg, oklch(1 0 0 / 0.012), transparent);
+}
+.ds-card-bd {
+  padding: 14px;
+}
+
+/* ---- live indicator ---- */
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 currentColor;
+    opacity: 0.8;
+  }
+  70% {
+    box-shadow: 0 0 0 8px transparent;
+    opacity: 0;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    opacity: 0;
+  }
+}
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
+/* ---- code block ---- */
+.ds-code {
+  font-family: 'Geist Mono', monospace;
+  font-size: 12px;
+  background: oklch(0.11 0.008 250);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: var(--fg-1);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin: 0;
+  overflow-x: auto;
+}
+.ds-code .kw {
+  color: var(--blue);
+}
+.ds-code .fn {
+  color: var(--amber);
+}
+.ds-code .str {
+  color: var(--emerald);
+}
+.ds-code .num {
+  color: var(--amber);
+}
+.ds-code .cm {
+  color: var(--fg-3);
+  font-style: italic;
+}
+.ds-code .id {
+  color: var(--fg-0);
+}
+
+/* ---- finding row (compact) ---- */
+.find {
+  display: grid;
+  grid-template-columns: 3px 28px 1fr auto;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-1);
+}
+.find .sev {
+  align-self: stretch;
+  border-radius: 3px;
+}
+.find.rose .sev {
+  background: var(--rose);
+}
+.find.emerald .sev {
+  background: var(--emerald);
+}
+.find.amber .sev {
+  background: var(--amber);
+}
+.find.blue .sev {
+  background: var(--blue);
+}
+
+/* ---- reasoning trace ---- */
+.reason {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 10px;
+  padding: 6px 0;
+}
+.reason .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-top: 5px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+}
+.reason.done .dot {
+  background: color-mix(in oklch, var(--emerald) 30%, var(--bg-2));
+  border-color: var(--emerald);
+}
+.reason.live .dot {
+  background: color-mix(in oklch, var(--blue) 30%, var(--bg-2));
+  border-color: var(--blue);
+  position: relative;
+}
+.reason.live .dot::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 1px solid var(--blue);
+  animation: pulse-ring 1.4s ease-out infinite;
+  color: var(--blue);
+}
+.reason.failed .dot {
+  background: color-mix(in oklch, var(--rose) 30%, var(--bg-2));
+  border-color: var(--rose);
+}
+.reason small {
+  color: var(--fg-3);
+  font-family: 'Geist Mono', monospace;
+  font-size: 10.5px;
+}
+
+/* ---- tabs ---- */
+.ds-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.ds-tab {
+  padding: 4px 11px;
+  border-radius: 6px;
+  color: var(--fg-2);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 120ms ease, color 120ms ease;
+}
+.ds-tab:hover {
+  color: var(--fg-1);
+}
+.ds-tab.active {
+  background: var(--bg-2);
+  color: var(--fg-0);
+}
+
+/* ---- kbd ---- */
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  color: var(--fg-2);
+  font: 500 10.5px/1 'Geist Mono', monospace;
+}
+
+/* ---- uppercase helper ---- */
+.uppercase-mini {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10.5px;
+}

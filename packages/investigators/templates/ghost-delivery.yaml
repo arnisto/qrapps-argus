@@ -1,0 +1,35 @@
+id: ghost-delivery
+name: Ghost Delivery Investigator
+description: >
+  Detect suspicious delivery confirmations — completions without supporting
+  evidence (GPS mismatch, off-hours confirmation, duplicate completions, or
+  refunds requested immediately after).
+
+triggers:
+  events:
+    - delivery.completed
+  schedule: "*/15 * * * *"   # also run every 15 minutes
+
+context:
+  lookback: 24h
+  related_events:
+    - delivery.completed
+    - delivery.failed
+    - gps.ping
+    - refund.requested
+    - driver.shift.started
+    - driver.shift.ended
+  max_events: 400
+
+checks:
+  - GPS coordinates at delivery confirmation differ from last known driver GPS by > 250m
+  - Delivery confirmed outside the driver's active shift window
+  - Same driver confirms two deliveries within 30 seconds of each other
+  - Refund requested for the order within 1 hour of the completion event
+  - Delivery confirmed for an order whose status was not "out for delivery"
+
+severity_threshold: medium
+
+output:
+  alert_channels:
+    - slack:ops

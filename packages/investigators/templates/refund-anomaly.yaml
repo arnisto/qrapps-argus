@@ -1,0 +1,34 @@
+id: refund-anomaly
+name: Refund Anomaly Investigator
+description: >
+  Detect spikes, clusters, and suspicious patterns in refund requests:
+  rate-of-change versus baseline, driver/zone concentration, and unusual
+  timing relative to delivery.
+
+triggers:
+  events:
+    - refund.requested
+  schedule: "0 */1 * * *"   # also run every hour
+
+context:
+  lookback: 7d
+  related_events:
+    - refund.requested
+    - refund.approved
+    - delivery.completed
+    - delivery.failed
+    - order.created
+  max_events: 1000
+
+checks:
+  - Refund volume in the last 24h is > 30% above the trailing 7-day baseline
+  - More than 25% of refunds in the window are tied to a single driver
+  - More than 35% of refunds in the window come from a single delivery zone
+  - Refunds requested < 15 minutes after delivery completion (suspicious cadence)
+  - The same customer requests > 3 refunds in the window
+
+severity_threshold: medium
+
+output:
+  alert_channels:
+    - slack:ops

@@ -1,0 +1,34 @@
+id: ghost-delivery
+name: Ghost Delivery Investigator
+description: >
+  Detect suspicious delivery confirmations — completions without supporting
+  evidence (GPS mismatch, off-hours confirmation, duplicate completions, or
+  refunds requested immediately after). v0.2 pipeline: evidence collector →
+  pattern analyst → finding writer.
+
+triggers:
+  events:
+    - delivery.completed
+  schedule: "*/15 * * * *"
+
+context:
+  lookback: 24h
+  related_events:
+    - delivery.completed
+    - delivery.failed
+    - gps.ping
+    - refund.requested
+    - driver.shift.started
+    - driver.shift.ended
+  max_events: 400
+
+severity_threshold: medium
+
+output:
+  alert_channels:
+    - slack:ops
+
+agents:
+  - { agent_id: evidence-collector-ghost, position: 0 }
+  - { agent_id: pattern-analyst-ghost,    position: 1 }
+  - { agent_id: finding-writer-ghost,     position: 2 }

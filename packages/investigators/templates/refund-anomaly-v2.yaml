@@ -1,0 +1,33 @@
+id: refund-anomaly
+name: Refund Anomaly Investigator
+description: >
+  Detect spikes, clusters, and suspicious patterns in refund requests:
+  rate-of-change versus baseline, driver/zone concentration, unusual timing
+  relative to delivery, and repeat customers. v0.2 pipeline: evidence
+  collector → pattern analyst → finding writer.
+
+triggers:
+  events:
+    - refund.requested
+  schedule: "0 */1 * * *"
+
+context:
+  lookback: 7d
+  related_events:
+    - refund.requested
+    - refund.approved
+    - delivery.completed
+    - delivery.failed
+    - order.created
+  max_events: 1000
+
+severity_threshold: medium
+
+output:
+  alert_channels:
+    - slack:ops
+
+agents:
+  - { agent_id: evidence-collector-refund, position: 0 }
+  - { agent_id: pattern-analyst-refund,    position: 1 }
+  - { agent_id: finding-writer-refund,     position: 2 }

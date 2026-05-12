@@ -1,0 +1,41 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build artifacts
+dist/
+build/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# env
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+logs/
+npm-debug.log*
+pnpm-debug.log*
+
+# coverage / test
+coverage/
+.nyc_output/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# docker volumes (when bind-mounted)
+.data/
+docker/data/
+
+# misc
+*.pid
+.cache/
+.eslintcache
+.parcel-cache/
