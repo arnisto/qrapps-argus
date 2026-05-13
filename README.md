@@ -145,6 +145,7 @@ See [docs/OPEN_SOURCE_STRATEGY.md](./docs/OPEN_SOURCE_STRATEGY.md).
 - [ARCHITECTURE.md](./docs/ARCHITECTURE.md) — current v0.1 system design
 - [ARCHITECTURE_TARGET.md](./docs/ARCHITECTURE_TARGET.md) — target three-plane architecture (north star)
 - [AGENT_LOOPS.md](./docs/AGENT_LOOPS.md) — four-loop agent runtime, auto-correction, budgeting
+- [KNOWLEDGE_GRAPH.md](./docs/KNOWLEDGE_GRAPH.md) — locked decisions + scaffolding for the Living Knowledge Graph
 - [MVP_SCOPE.md](./docs/MVP_SCOPE.md) — what ships in v0.1
 - [ROADMAP.md](./docs/ROADMAP.md) — what's next
 - [INVESTIGATORS.md](./docs/INVESTIGATORS.md) — how to write an investigator

@@ -10,7 +10,10 @@ name: argus
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # pgvector image bundles pgvector on top of postgres:16. pg_trgm ships
+    # with Postgres core. Both extensions are CREATEd by migration 0006
+    # (the Knowledge Graph). See docs/KNOWLEDGE_GRAPH.md.
+    image: pgvector/pgvector:pg16
     container_name: argus-postgres
     restart: unless-stopped
     environment:
@@ -20,6 +23,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+      - ./docker/postgres/migrations/0006_knowledge_graph.sql:/docker-entrypoint-initdb.d/06-knowledge-graph.sql:ro
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
