@@ -1,0 +1,50 @@
+id: dormant_shipper_reactivation
+title: Dormant High-Value Shipper Reactivation
+kind: opportunity
+database: intigo
+domain: revenue
+
+hypothesis: >
+  Shippers who once generated meaningful fee revenue but have shipped nothing
+  in 120+ days are proven customers who churned silently. Reactivating even a
+  small fraction recovers high-margin recurring revenue at near-zero CAC.
+
+detection_sql: |
+  WITH s AS (
+    SELECT business_id,
+           SUM(billed_amount)            AS hist_fees,
+           COUNT(*)                       AS hist_parcels,
+           MAX(created_at)                AS last_parcel
+    FROM   logistics_parcel
+    GROUP  BY business_id
+  )
+  SELECT
+    COUNT(*)                              AS dormant_shippers,
+    SUM(hist_fees)::numeric(14,2)         AS dormant_lifetime_fees_tnd,
+    SUM(hist_parcels)                     AS dormant_lifetime_parcels,
+    (SUM(hist_fees) / NULLIF(COUNT(*),0))::numeric(14,2) AS avg_fees_per_shipper_tnd
+  FROM s
+  WHERE hist_fees > 5000
+    AND last_parcel < NOW() - INTERVAL '120 days';
+
+headline: "{dormant_shippers} proven shippers ({dormant_lifetime_fees_tnd} lifetime fees) have gone silent for 120+ days."
+
+sizing:
+  gross_metric: dormant_lifetime_fees_tnd
+  realization_factor: 0.05   # reactivate 5% of proven lifetime value within a year
+  basis: >
+    {gross} of proven lifetime fee value is now dormant. A targeted win-back
+    campaign converting just 5% ({factor_pct}) of that proven value recovers
+    {opportunity} in fee revenue — at near-zero acquisition cost since they
+    already onboarded and shipped.
+
+severity:
+  - if: "dormant_lifetime_fees_tnd > 5000000"
+    level: high
+  - if: "dormant_lifetime_fees_tnd > 500000"
+    level: medium
+
+recommended_action: >
+  Launch a win-back program ranked by lifetime fees: personal outreach to the
+  top 50 dormant shippers, a pricing incentive for the next tier, and an
+  automated re-engagement sequence for the long tail.

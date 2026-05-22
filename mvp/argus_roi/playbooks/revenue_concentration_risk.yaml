@@ -1,0 +1,56 @@
+id: revenue_concentration_risk
+title: Revenue Concentration Risk (Top 10 Shippers)
+kind: risk
+database: intigo
+domain: revenue
+
+hypothesis: >
+  If a large share of delivered COD volume flows through a handful of shippers,
+  losing any one of them materially dents revenue. This sizes the exposure of
+  the top-10 concentration.
+
+detection_sql: |
+  WITH s AS (
+    SELECT business_id,
+           SUM(price) FILTER (WHERE status = 5000)        AS cod,
+           SUM(billed_amount)                              AS fees
+    FROM   logistics_parcel
+    GROUP  BY business_id
+  ),
+  ranked AS (
+    SELECT business_id, cod, fees,
+           ROW_NUMBER() OVER (ORDER BY cod DESC NULLS LAST) AS rk,
+           SUM(cod) OVER ()  AS total_cod,
+           SUM(fees) OVER ()  AS total_fees
+    FROM s
+  )
+  SELECT
+    SUM(cod) FILTER (WHERE rk <= 10)::numeric(16,2)              AS top10_cod_tnd,
+    MAX(total_cod)::numeric(16,2)                                AS total_cod_tnd,
+    ROUND(SUM(cod) FILTER (WHERE rk <= 10) / NULLIF(MAX(total_cod),0) * 100, 1) AS top10_share_pct,
+    SUM(fees) FILTER (WHERE rk <= 10)::numeric(16,2)             AS top10_fees_tnd,
+    SUM(fees) FILTER (WHERE rk = 1)::numeric(16,2)               AS top1_fees_tnd
+  FROM ranked;
+
+headline: "The top 10 shippers carry {top10_cod_tnd} of delivered COD ({top10_share_pct}% of all volume); top-1 alone earns Intigo {top1_fees_tnd} in fees."
+
+sizing:
+  gross_metric: top1_fees_tnd
+  realization_factor: 1.0   # this is revenue AT RISK (defensive), not a gain
+  basis: >
+    Losing the single largest shipper would remove {gross} of annual fee
+    revenue. This is exposure to defend, not money to gain — the figure is the
+    fee revenue that walks out the door if the #1 account churns.
+
+severity:
+  - if: "top10_share_pct > 50"
+    level: critical
+  - if: "top10_share_pct > 30"
+    level: high
+  - if: "top10_share_pct > 15"
+    level: medium
+
+recommended_action: >
+  Lock the top-10 with volume-commitment contracts and assign each a named
+  account owner; simultaneously diversify by accelerating the mid-tail so no
+  single shipper exceeds a safe revenue share.

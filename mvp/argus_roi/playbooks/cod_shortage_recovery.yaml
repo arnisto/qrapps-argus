@@ -1,0 +1,40 @@
+id: cod_shortage_recovery
+title: Driver COD Shortage Recovery
+kind: recovery
+database: intigo_finance
+domain: logistics_finance
+
+hypothesis: >
+  Drivers collect cash-on-delivery and remit it to Intigo. Recorded shortages
+  (manques) that remain unpaid are cash the company is directly owed and can
+  recover via payroll deduction — the cleanest possible recovery channel.
+
+detection_sql: |
+  SELECT
+    COUNT(*)                                       AS open_shortages,
+    COUNT(DISTINCT driver_id)                       AS drivers_involved,
+    SUM(missing_amount)::numeric(14,2)             AS still_owed_tnd,
+    MAX(missing_amount)::numeric(14,2)             AS largest_single_tnd
+  FROM finance_manque
+  WHERE NOT is_paid;
+
+headline: "{open_shortages} unpaid driver cash shortages totalling {still_owed_tnd} are directly recoverable."
+
+sizing:
+  gross_metric: still_owed_tnd
+  realization_factor: 0.80   # 80% recoverable via payroll deduction (drivers still active)
+  basis: >
+    {gross} is owed by drivers for unremitted COD. Payroll deduction is the
+    recovery channel, so realization is high — a conservative 80% ({factor_pct})
+    yields {opportunity} after allowing for departed drivers.
+
+severity:
+  - if: "still_owed_tnd > 50000"
+    level: high
+  - if: "still_owed_tnd > 10000"
+    level: medium
+
+recommended_action: >
+  Enroll every open manque into a payroll-deduction plan this cycle; escalate
+  shortages from departed drivers to formal recovery. Prioritise the largest
+  single balances first.

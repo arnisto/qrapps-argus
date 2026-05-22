@@ -1,0 +1,50 @@
+id: ghost_employee_exposure
+title: Ghost-Employee Financial Exposure
+kind: recovery
+database: intigo_finance
+domain: hr_finance
+
+hypothesis: >
+  Employees who have not logged in for 90+ days but are still flagged active
+  carry outstanding company loans and salary advances. If they have effectively
+  left, these balances are at risk of becoming unrecoverable write-offs.
+
+detection_sql: |
+  WITH ghosts AS (
+    SELECT e.id
+    FROM   hr_employee e
+    JOIN   auth_user u ON u.id = e.user_id
+    WHERE  e.exit_date IS NULL
+      AND  u.last_login < NOW() - INTERVAL '90 days'
+  )
+  SELECT
+    (SELECT COUNT(*) FROM ghosts)                                              AS ghost_employees,
+    COALESCE((SELECT SUM(l.amount) FROM payroll_employeeloan l
+              WHERE l.employee_id IN (SELECT id FROM ghosts) AND NOT l.is_paid),0)::numeric(14,2) AS outstanding_loans_tnd,
+    COALESCE((SELECT SUM(a.amount) FROM payroll_payrollsalaryadvance a
+              WHERE a.employee_id IN (SELECT id FROM ghosts) AND NOT a.is_paid),0)::numeric(14,2) AS outstanding_advances_tnd,
+    (COALESCE((SELECT SUM(l.amount) FROM payroll_employeeloan l
+              WHERE l.employee_id IN (SELECT id FROM ghosts) AND NOT l.is_paid),0)
+     + COALESCE((SELECT SUM(a.amount) FROM payroll_payrollsalaryadvance a
+              WHERE a.employee_id IN (SELECT id FROM ghosts) AND NOT a.is_paid),0))::numeric(14,2) AS total_exposure_tnd;
+
+headline: "{ghost_employees} active-on-paper employees haven't logged in for 90+ days yet owe {total_exposure_tnd} in loans + advances."
+
+sizing:
+  gross_metric: total_exposure_tnd
+  realization_factor: 0.60   # 60% recoverable if pursued promptly via documented loan agreements
+  basis: >
+    {gross} is outstanding to people who appear to have left. Acting now —
+    formal exit + recovery on documented loan agreements — realistically
+    recovers ~60% ({factor_pct} = {opportunity}); delay erodes it to zero.
+
+severity:
+  - if: "total_exposure_tnd > 30000"
+    level: high
+  - if: "total_exposure_tnd > 5000"
+    level: medium
+
+recommended_action: >
+  Run an absence audit: for every 90+ day-inactive 'active' employee, confirm
+  status with their manager, finalize exits, and trigger loan/advance recovery
+  before balances become unrecoverable.

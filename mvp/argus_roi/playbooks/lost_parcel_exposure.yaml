@@ -1,0 +1,42 @@
+id: lost_parcel_exposure
+title: Lost-Parcel Value Exposure
+kind: recovery
+database: intigo
+domain: logistics
+
+hypothesis: >
+  Parcels permanently marked lost (status 9004-9006) carry COD value that was
+  never collected and may be partially recoverable via insurance claims and
+  driver-liability for recent cases.
+
+detection_sql: |
+  SELECT
+    COUNT(*)                                   AS lost_parcels,
+    SUM(price)::numeric(14,2)                  AS lost_value_tnd,
+    COUNT(*) FILTER (WHERE date_of_exit > NOW() - INTERVAL '90 days') AS recent_lost_90d,
+    SUM(price) FILTER (WHERE date_of_exit > NOW() - INTERVAL '90 days')::numeric(14,2) AS recent_lost_value_tnd
+  FROM logistics_parcel
+  WHERE status IN (9004, 9005, 9006);
+
+headline: "{lost_parcels} parcels are marked lost, representing {lost_value_tnd} in uncollected COD value."
+
+sizing:
+  gross_metric: lost_value_tnd
+  realization_factor: 0.15   # ~15% recoverable: insurance + driver liability on recent cases
+  basis: >
+    Of {gross} gross lost value, a 15% realization factor ({factor_pct}) yields
+    {opportunity} — a conservative estimate of insurance-claimable + driver-liable
+    value, weighted toward the recent (<90d) cases that are still actionable.
+
+severity:
+  - if: "lost_value_tnd > 1000000"
+    level: critical
+  - if: "lost_value_tnd > 200000"
+    level: high
+  - if: "lost_value_tnd > 50000"
+    level: medium
+
+recommended_action: >
+  Stand up a lost-parcel recovery desk: file insurance claims on the recent
+  (<90d) cluster first, pursue driver liability where the last-scan driver is
+  identified, and write off the aged remainder to clean the books.
