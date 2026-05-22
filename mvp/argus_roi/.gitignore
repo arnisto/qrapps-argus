@@ -1,0 +1,7 @@
+# runtime output — results live in Postgres + Redis, not files
+logs/
+reports/
+autopilot/logs/
+autopilot/reports/
+__pycache__/
+*.pyc

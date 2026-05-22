@@ -163,7 +163,7 @@ def fmt_money(v: float) -> str:
 # --------------------------------------------------------------------------
 # Memo composer (deterministic, template-based — no hallucinated numbers)
 # --------------------------------------------------------------------------
-def compose_memo(findings: list[Finding]) -> str:
+def compose_memo(findings: list[Finding], use_llm: bool = False) -> str:
     findings = sorted(findings, key=lambda f: (SEV_RANK[f.severity], -f.opportunity_value))
     opps = [f for f in findings if f.kind in ("opportunity", "recovery")]
     risks = [f for f in findings if f.kind == "risk"]
@@ -176,6 +176,24 @@ def compose_memo(findings: list[Finding]) -> str:
     L.append(f"# Argus Operational Intelligence Memo")
     L.append(f"_Generated {today} · source: live Postgres · every number links to its SQL receipt_")
     L.append("")
+
+    # Optional LLM narrative (prose only — numbers stay deterministic).
+    if use_llm:
+        try:
+            from composer import compose_narrative
+            res = compose_narrative([asdict(f) for f in findings],
+                                    {"opportunity": total_opportunity, "at_risk": total_at_risk})
+            if res.get("narrative"):
+                L.append("## Executive summary")
+                L.append("")
+                L.append(res["narrative"])
+                L.append("")
+                L.append(f"_↑ narrative by {res['provider']}/{res['model']} — "
+                         f"prose only; all figures are deterministic SQL results._")
+                L.append("")
+        except Exception:
+            pass  # LLM is a nice-to-have; deterministic memo always ships
+
     L.append("## Bottom line")
     L.append("")
     L.append(f"- **{fmt_money(total_opportunity)}** in identified recoverable / realizable value this quarter")
@@ -232,6 +250,8 @@ def main():
     ap.add_argument("--out", help="write memo to this markdown file")
     ap.add_argument("--json", help="dump structured findings to this json file")
     ap.add_argument("--playbooks", default=str(PLAYBOOK_DIR))
+    ap.add_argument("--llm", action="store_true",
+                    help="add an LLM-written executive summary (uses ARGUS_* provider from .env)")
     args = ap.parse_args()
 
     files = sorted(glob.glob(os.path.join(args.playbooks, "*.yaml")))
@@ -253,7 +273,7 @@ def main():
         except Exception as e:
             print(f"  ✗ {pb['id']:32s} ERROR: {e}", file=sys.stderr)
 
-    memo = compose_memo(findings)
+    memo = compose_memo(findings, use_llm=args.llm)
     print("\n" + "=" * 70 + "\n", file=sys.stderr)
     print(memo)
 
