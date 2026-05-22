@@ -25,7 +25,7 @@ import store
 from mapper import map_database
 from generator import generate_playbooks, _compact_schema
 from validator import validate_playbook
-from llm import call_llm, model_id
+from llm import call_llm, model_id, set_purpose, drain_calls
 
 SEV_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 SEV_EMOJI = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}
@@ -138,10 +138,12 @@ def run(target: str, n: int, use_narrative: bool) -> dict:
     log(f"   mapped {len(schema['tables'])} tables")
 
     log(f"② generating {n} playbooks via {model_id()}…")
+    set_purpose("generate_playbooks")
     pbs = generate_playbooks(schema, n=n)
     log(f"   generated {len(pbs)}")
 
     log("③ validating + self-correcting SQL…")
+    set_purpose("fix_sql")
     findings, valid = [], 0
     for pb in pbs:
         vp = validate_playbook(pb, schema_text)
@@ -157,16 +159,21 @@ def run(target: str, n: int, use_narrative: bool) -> dict:
     totals = {"opp": opp, "risk": risk}
 
     log("④ composing memo…")
+    set_purpose("memo_narrative")
     narrative = llm_summary(findings, totals) if (use_narrative and findings) else None
     memo = compose_memo(findings, totals, run_id, target, narrative)
 
     log("⑤ persisting to Postgres + Redis…")
     store.save_findings(run_id, findings)
     store.finish_run(run_id, "succeeded", len(pbs), valid, opp, risk, memo)
+    usage = store.save_llm_calls(run_id, drain_calls())
+    log(f"   LLM: {usage['model']} · {usage['calls']} calls · "
+        f"{usage['tokens_in']:,} in / {usage['tokens_out']:,} out · ~${usage['cost_usd']:.4f}")
     store.cache_latest({
         "run_id": run_id, "target": target, "generated_at": dt.datetime.now().isoformat(),
         "total_opportunity": round(opp, 2), "total_at_risk": round(risk, 2),
         "n_findings": len(findings), "memo_md": memo,
+        "llm": usage,
         "findings": [{k: f[k] for k in ("id", "title", "severity", "opportunity_value")} for f in findings],
     })
     log(f"[run #{run_id}] done — {len(findings)} findings, {money(opp)} realizable\n")

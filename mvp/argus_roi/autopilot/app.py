@@ -17,6 +17,7 @@ Everything reads/writes the live `argus` Postgres and the user's crontab.
 
 from __future__ import annotations
 
+import glob
 import html
 import json
 import subprocess
@@ -26,6 +27,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import store
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
 
 HERE = Path(__file__).resolve().parent
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8090
@@ -48,8 +54,8 @@ def esc(s):
 # ---------- data ----------
 def latest_run():
     r = store.pg("SELECT id,target_db,started_at,total_opportunity,total_at_risk,"
-                 "playbooks_valid,memo_md FROM autopilot.run WHERE status='succeeded' "
-                 "ORDER BY id DESC LIMIT 1;", capture=True)
+                 "playbooks_valid,memo_md,llm_model,llm_calls,tokens_in,tokens_out,cost_usd "
+                 "FROM autopilot.run WHERE status='succeeded' ORDER BY id DESC LIMIT 1;", capture=True)
     return r[0] if r else None
 
 
@@ -82,13 +88,47 @@ def get_crontab():
     return p.stdout if p.returncode == 0 else ""
 
 
+def llm_calls_for(run_id):
+    return store.pg("SELECT purpose,model,tokens_in,tokens_out,latency_ms,cost_usd,ok "
+                    f"FROM autopilot.llm_call WHERE run_id={int(run_id)} ORDER BY id;", capture=True)
+
+
+def usage_history():
+    return store.pg("SELECT id,target_db,started_at,llm_model,llm_calls,tokens_in,tokens_out,cost_usd "
+                    "FROM autopilot.run WHERE status='succeeded' AND llm_calls>0 "
+                    "ORDER BY id DESC LIMIT 12;", capture=True)
+
+
+def playbooks_db():
+    return store.pg("SELECT DISTINCT ON (playbook_key) playbook_key,title,kind,hypothesis,valid,"
+                    "validation_note,generated_by,target_db,created_at FROM autopilot.playbook "
+                    "ORDER BY playbook_key, created_at DESC;", capture=True)
+
+
+def playbooks_yaml():
+    out = []
+    pbdir = HERE.parent / "playbooks"
+    for fp in sorted(glob.glob(str(pbdir / "*.yaml"))):
+        try:
+            d = yaml.safe_load(Path(fp).read_text()) if yaml else {}
+        except Exception:
+            d = {}
+        out.append({"file": Path(fp).name, "id": d.get("id", ""), "title": d.get("title", ""),
+                    "kind": d.get("kind", ""), "hypothesis": (d.get("hypothesis") or "").strip(),
+                    "action": (d.get("recommended_action") or "").strip()})
+    return out
+
+
 # ---------- chrome ----------
 def page(active, body):
     nav = "".join(
         f'<a href="{href}" class="{ "on" if active==key else "" }">{label}</a>'
         for key, href, label in (("reports", "/", "Reports"),
                                   ("connectors", "/connectors", "Connectors"),
-                                  ("schedule", "/schedule", "Schedule")))
+                                  ("playbooks", "/playbooks", "Playbooks"),
+                                  ("usage", "/usage", "LLM Usage"),
+                                  ("schedule", "/schedule", "Schedule"),
+                                  ("help", "/help", "Help")))
     return f"""<!doctype html><html><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>Argus</title>
 <style>
@@ -157,8 +197,14 @@ def view_reports():
     hist = "".join(f"<tr><td>#{h['id']}</td><td>{esc(h['target_db'])}</td><td>{h['started_at'][:16]}</td>"
                    f"<td class=r>{money(h['total_opportunity'])}</td><td class=r>{money(h['total_at_risk'])}</td></tr>"
                    for h in runs_history())
+    llm_line = ""
+    if run.get("llm_model"):
+        llm_line = (f"<p class=muted>🧠 powered by <b>{esc(run['llm_model'])}</b> · "
+                    f"{run['llm_calls']} calls · {int(run['tokens_in']):,}+{int(run['tokens_out']):,} tokens · "
+                    f"~${float(run['cost_usd']):.4f} · <a href=/usage>usage details →</a></p>")
     body = f"""<h1>Reports</h1>
 <p class=muted>Run #{run['id']} · target <b>{esc(run['target_db'])}</b> · {len(fs)} findings · {run['started_at'][:16]}</p>
+{llm_line}
 <div class=bignums>
 <div class="big opp"><div class=lbl>Realizable this run</div><div class=v>{money(run['total_opportunity'])}</div></div>
 <div class="big risk"><div class=lbl>Revenue at risk</div><div class=v>{money(run['total_at_risk'])}</div></div></div>
@@ -220,6 +266,105 @@ def view_schedule():
     return page("schedule", body)
 
 
+def view_usage():
+    run = latest_run()
+    body = "<h1>LLM Usage</h1><p class=muted>Exactly which model ran, how many tokens, and the estimated cost. Numbers come from the provider's usage metadata.</p>"
+    if run and run.get("llm_model"):
+        calls = llm_calls_for(run["id"])
+        body += f"""<div class=bignums>
+<div class=big><div class=lbl>Model</div><div class=v style="font-size:18px">{esc(run['llm_model'])}</div></div>
+<div class=big><div class=lbl>Calls (run #{run['id']})</div><div class=v>{run['llm_calls']}</div></div>
+<div class=big><div class=lbl>Tokens</div><div class=v style="font-size:20px">{int(run['tokens_in']):,}<span class=muted style="font-size:13px"> in</span> · {int(run['tokens_out']):,}<span class=muted style="font-size:13px"> out</span></div></div>
+<div class=big><div class=lbl>Est. cost</div><div class=v>${float(run['cost_usd']):.4f}</div></div></div>
+<h2 style="font-size:15px">Calls this run</h2>
+<table><tr><th>Purpose</th><th>Model</th><th class=r>Tokens in</th><th class=r>Tokens out</th><th class=r>Latency</th><th class=r>Cost</th><th>OK</th></tr>"""
+        for c in calls:
+            ok = "✓" if c["ok"] in ("t", True, "true") else "✗"
+            body += (f"<tr><td>{esc(c['purpose'])}</td><td>{esc(c['model'])}</td>"
+                     f"<td class=r>{int(c['tokens_in']):,}</td><td class=r>{int(c['tokens_out']):,}</td>"
+                     f"<td class=r>{int(c['latency_ms'])} ms</td><td class=r>${float(c['cost_usd']):.5f}</td><td>{ok}</td></tr>")
+        body += "</table>"
+    else:
+        body += "<p class=muted>No LLM usage recorded yet. Run an analysis from <a href=/schedule>Schedule</a>.</p>"
+
+    hist = "".join(f"<tr><td>#{h['id']}</td><td>{esc(h['target_db'])}</td><td>{h['started_at'][:16]}</td>"
+                   f"<td>{esc(h['llm_model'] or '')}</td><td class=r>{h['llm_calls']}</td>"
+                   f"<td class=r>{int(h['tokens_in']):,}</td><td class=r>{int(h['tokens_out']):,}</td>"
+                   f"<td class=r>${float(h['cost_usd']):.4f}</td></tr>" for h in usage_history())
+    body += (f"<h2 style='font-size:15px;margin-top:24px'>Cost per run (history)</h2>"
+             f"<table><tr><th>Run</th><th>Target</th><th>When</th><th>Model</th><th class=r>Calls</th>"
+             f"<th class=r>In</th><th class=r>Out</th><th class=r>Cost</th></tr>{hist}</table>"
+             f"<p class=muted style='margin-top:10px'>Pricing is an estimate "
+             f"(gemini-2.5-flash ≈ $0.30/1M in, $2.50/1M out incl. thinking). Tune in <code>llm.py</code>.</p>")
+    return page("usage", body)
+
+
+def view_playbooks():
+    yamls = playbooks_yaml()
+    yrows = "".join(
+        f"<div class=card><div class=top><span class=badge style='background:#334155'>SEED</span>"
+        f"<h3>{esc(p['title'] or p['id'])}</h3><span class=muted>{esc(p['file'])}</span></div>"
+        f"<div class=hl>{esc(p['hypothesis'])}</div>"
+        f"<div class=kv><b>Action:</b> {esc(p['action'])}</div></div>" for p in yamls)
+
+    dbpbs = playbooks_db()
+    drows = ""
+    for p in dbpbs:
+        valid = p["valid"] in ("t", True, "true")
+        badge = ("#064e3b" if valid else "#3a2030")
+        lbl = "VALID" if valid else "REJECTED"
+        drows += (f"<div class=card><div class=top>"
+                  f"<span class=badge style='background:{badge};color:#fff'>{lbl}</span>"
+                  f"<h3>{esc(p['title'])}</h3><span class=muted>{esc(p['kind'])}</span></div>"
+                  f"<div class=hl>{esc(p['hypothesis'] or '')}</div>"
+                  f"<div class=kv><b>Source:</b> {esc(p['generated_by'])} · target {esc(p['target_db'])} · "
+                  f"{esc((p['validation_note'] or '')[:80])}</div></div>")
+
+    body = (f"<h1>Playbooks</h1>"
+            f"<p class=muted>The questions Argus asks your data. Two kinds: hand-written seed YAML files, "
+            f"and the ones the LLM invents each run (stored in the DB, valid + rejected).</p>"
+            f"<h2 style='font-size:15px'>Seed playbooks — <code>mvp/argus_roi/playbooks/*.yaml</code> ({len(yamls)})</h2>{yrows}"
+            f"<h2 style='font-size:15px;margin-top:24px'>LLM-generated playbooks ({len(dbpbs)} unique)</h2>{drows or '<p class=muted>None yet — run an analysis.</p>'}")
+    return page("playbooks", body)
+
+
+def view_help():
+    body = """<h1>How Argus works</h1>
+<p class=muted>The whole system on one page. Less is more.</p>
+
+<div class=card><h3>What it does</h3>
+<div class=hl>Every day, Argus connects to your databases, asks an LLM to invent
+"playbooks" (money-finding questions), runs them against your live data, sizes each
+finding in TND, and shows you a ranked report. You never write SQL or prompts.</div></div>
+
+<div class=card><h3>The daily loop</h3>
+<div class=kv><b>1. Map</b> — reads your DB structure (tables, columns, relationships).</div>
+<div class=kv><b>2. Generate</b> — the LLM invents opportunity playbooks from that map. <a href=/playbooks>See playbooks →</a></div>
+<div class=kv><b>3. Validate</b> — runs each playbook's SQL read-only; if it errors, the LLM fixes it (up to 3 tries).</div>
+<div class=kv><b>4. Size</b> — multiplies the raw number by a conservative "realization factor" to estimate recoverable value.</div>
+<div class=kv><b>5. Report</b> — ranks findings, writes a summary, stores everything. <a href=/>See reports →</a></div></div>
+
+<div class=card><h3>The pages</h3>
+<div class=kv><b>Reports</b> — the money findings from the latest run, each with the exact SQL that proves it.</div>
+<div class=kv><b>Connectors</b> — the databases Argus analyses. Enable/disable/add/test them.</div>
+<div class=kv><b>Playbooks</b> — every question Argus asks (seed + LLM-invented).</div>
+<div class=kv><b>LLM Usage</b> — which model ran, token counts, estimated cost per run.</div>
+<div class=kv><b>Schedule</b> — when the daily run happens; change the time or run now.</div></div>
+
+<div class=card><h3>What you can trust</h3>
+<div class=kv>• Every number is a real SQL result — the database is the calculator, never the LLM.</div>
+<div class=kv>• Every finding has a "Show the SQL" button — click to verify.</div>
+<div class=kv>• All DB access is read-only with a 30-second timeout. Argus never writes to your data.</div></div>
+
+<div class=card><h3>Honest limits (today)</h3>
+<div class=kv>• The LLM invents fresh playbooks each run, so the total swings day to day — great for discovery, not yet for tracking the same number over time.</div>
+<div class=kv>• Realization factors are estimates, not calibrated to your real recovery rates.</div>
+<div class=kv>• Local tool: needs this machine on + Docker (argus Postgres/Redis) up. No login yet — don't expose port 8090 to the internet.</div></div>
+
+<p class=muted>Repo: <code>mvp/argus_roi/autopilot/</code> · data in the <code>argus</code> Postgres (schema <code>autopilot</code>) + Redis key <code>argus:latest</code>.</p>"""
+    return page("help", body)
+
+
 # ---------- actions ----------
 def test_connector(cid):
     rows = store.pg(f"SELECT dbname,pg_user FROM autopilot.connector WHERE id={int(cid)};", capture=True)
@@ -277,8 +422,14 @@ class H(BaseHTTPRequestHandler):
                 self._send(view_reports())
             elif self.path == "/connectors":
                 self._send(view_connectors())
+            elif self.path == "/playbooks":
+                self._send(view_playbooks())
+            elif self.path == "/usage":
+                self._send(view_usage())
             elif self.path == "/schedule":
                 self._send(view_schedule())
+            elif self.path == "/help":
+                self._send(view_help())
             else:
                 self._send("not found", 404, "text/plain")
         except Exception as e:

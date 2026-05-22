@@ -119,5 +119,26 @@ def finish_run(run_id: int, status: str, gen: int, valid: int,
         f"WHERE id = {run_id};")
 
 
+def save_llm_calls(run_id: int, calls: list[dict]) -> dict:
+    """Persist each LLM call; return aggregate totals for the run."""
+    tot = {"calls": 0, "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0, "model": None}
+    for c in calls:
+        tot["calls"] += 1
+        tot["tokens_in"] += int(c["tokens_in"])
+        tot["tokens_out"] += int(c["tokens_out"])
+        tot["cost_usd"] += float(c["cost_usd"])
+        tot["model"] = c["model"]
+        pg("INSERT INTO autopilot.llm_call (run_id, model, purpose, tokens_in, tokens_out, "
+           "latency_ms, cost_usd, ok) VALUES ("
+           f"{run_id}, {dq(c['model'])}, {dq(c['purpose'])}, {int(c['tokens_in'])}, "
+           f"{int(c['tokens_out'])}, {int(c['latency_ms'])}, {float(c['cost_usd'])}, "
+           f"{str(c['ok']).lower()});")
+    pg("UPDATE autopilot.run SET "
+       f"llm_model={dq(tot['model'])}, llm_calls={tot['calls']}, "
+       f"tokens_in={tot['tokens_in']}, tokens_out={tot['tokens_out']}, "
+       f"cost_usd={tot['cost_usd']:.5f} WHERE id={run_id};")
+    return tot
+
+
 def cache_latest(payload: dict):
     redis_set("argus:latest", json.dumps(payload))

@@ -82,3 +82,25 @@ CREATE TABLE IF NOT EXISTS autopilot.connector (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- LLM usage accounting (added for the Usage page).
+ALTER TABLE autopilot.run
+  ADD COLUMN IF NOT EXISTS llm_model  TEXT,
+  ADD COLUMN IF NOT EXISTS llm_calls  INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS tokens_in  BIGINT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS tokens_out BIGINT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cost_usd   NUMERIC(12,5) DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS autopilot.llm_call (
+  id          BIGSERIAL PRIMARY KEY,
+  run_id      BIGINT REFERENCES autopilot.run(id) ON DELETE CASCADE,
+  model       TEXT,
+  purpose     TEXT,                 -- generate_playbooks | fix_sql | memo_narrative
+  tokens_in   INT DEFAULT 0,
+  tokens_out  INT DEFAULT 0,
+  latency_ms  INT DEFAULT 0,
+  cost_usd    NUMERIC(12,6) DEFAULT 0,
+  ok          BOOLEAN DEFAULT true,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS llm_call_run_idx ON autopilot.llm_call (run_id);

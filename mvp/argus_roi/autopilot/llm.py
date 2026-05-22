@@ -1,7 +1,11 @@
 """
-Shared LLM access for the autopilot. Reads provider + key from repo .env.
-Implements Gemini (the configured default). One retry-with-backoff caller and
-a tolerant JSON extractor (LLMs love to wrap JSON in prose / code fences).
+Shared LLM access for the autopilot — now with usage accounting.
+
+Every call records: model, purpose, input/output tokens, latency, and an
+estimated cost. autopilot drains these per run and persists them so the UI
+can show exactly which model ran and how much it cost.
+
+Reads provider + key from repo .env. Implements Gemini (configured default).
 """
 
 from __future__ import annotations
@@ -15,6 +19,29 @@ import urllib.error
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+# Estimated USD price per 1M tokens. Clearly an estimate — tune to your billing.
+# Gemini 2.5 Flash (input incl. cached, output incl. thinking).
+PRICING = {
+    "gemini-2.5-flash": {"in": 0.30, "out": 2.50},
+    "gemini-2.0-flash": {"in": 0.10, "out": 0.40},
+    "gemini-flash-latest": {"in": 0.30, "out": 2.50},
+}
+
+# Per-run call ledger. autopilot sets the purpose, drains after each run.
+_CALLS: list[dict] = []
+_PURPOSE = "misc"
+
+
+def set_purpose(p: str):
+    global _PURPOSE
+    _PURPOSE = p
+
+
+def drain_calls() -> list[dict]:
+    global _CALLS
+    out, _CALLS = _CALLS, []
+    return out
 
 
 def load_env() -> dict:
@@ -30,6 +57,17 @@ def load_env() -> dict:
     return env
 
 
+def model_id() -> str:
+    env = load_env()
+    p = env.get("ARGUS_DEFAULT_AI_PROVIDER", "gemini").lower()
+    return f"{p}/{env.get('ARGUS_GEMINI_MODEL', 'gemini-2.5-flash')}"
+
+
+def _cost(model: str, tin: int, tout: int) -> float:
+    pr = PRICING.get(model, {"in": 0.30, "out": 2.50})
+    return (tin / 1_000_000) * pr["in"] + (tout / 1_000_000) * pr["out"]
+
+
 def call_llm(prompt: str, max_tokens: int = 8192, temperature: float = 0.3) -> str | None:
     env = load_env()
     provider = env.get("ARGUS_DEFAULT_AI_PROVIDER", "gemini").lower()
@@ -38,12 +76,6 @@ def call_llm(prompt: str, max_tokens: int = 8192, temperature: float = 0.3) -> s
                        env.get("ARGUS_GEMINI_MODEL", "gemini-2.5-flash"),
                        max_tokens, temperature)
     return None
-
-
-def model_id() -> str:
-    env = load_env()
-    p = env.get("ARGUS_DEFAULT_AI_PROVIDER", "gemini").lower()
-    return f"{p}/{env.get('ARGUS_GEMINI_MODEL', 'gemini-2.5-flash')}"
 
 
 def _gemini(prompt, key, model, max_tokens, temperature, retries=4) -> str | None:
@@ -56,32 +88,45 @@ def _gemini(prompt, key, model, max_tokens, temperature, retries=4) -> str | Non
         "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens},
     }).encode()
     for attempt in range(retries):
+        t0 = time.time()
         try:
             req = urllib.request.Request(url, data=body,
                                          headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(req, timeout=90) as resp:
                 data = json.loads(resp.read())
-            return data["candidates"][0]["content"]["parts"][0]["text"]
+            text = data["candidates"][0]["content"]["parts"][0]["text"]
+            um = data.get("usageMetadata", {})
+            tin = int(um.get("promptTokenCount", 0))
+            # candidatesTokenCount + thoughtsTokenCount = what we're billed for output
+            tout = int(um.get("candidatesTokenCount", 0)) + int(um.get("thoughtsTokenCount", 0))
+            _CALLS.append({
+                "model": model, "purpose": _PURPOSE,
+                "tokens_in": tin, "tokens_out": tout,
+                "latency_ms": int((time.time() - t0) * 1000),
+                "cost_usd": round(_cost(model, tin, tout), 6), "ok": True,
+            })
+            return text
         except urllib.error.HTTPError as e:
             if e.code in (429, 503) and attempt < retries - 1:
                 time.sleep(2 * (attempt + 1))
                 continue
+            _CALLS.append({"model": model, "purpose": _PURPOSE, "tokens_in": 0, "tokens_out": 0,
+                           "latency_ms": int((time.time() - t0) * 1000), "cost_usd": 0, "ok": False})
             return None
         except Exception:
             if attempt < retries - 1:
                 time.sleep(2)
                 continue
+            _CALLS.append({"model": model, "purpose": _PURPOSE, "tokens_in": 0, "tokens_out": 0,
+                           "latency_ms": int((time.time() - t0) * 1000), "cost_usd": 0, "ok": False})
             return None
     return None
 
 
 def extract_json(text: str):
-    """Pull the first JSON array/object out of an LLM response."""
     if not text:
         return None
-    # strip code fences
     text = re.sub(r"```(?:json)?", "", text).strip("` \n")
-    # find the outermost array or object
     for opener, closer in (("[", "]"), ("{", "}")):
         start = text.find(opener)
         if start == -1:
