@@ -67,3 +67,18 @@ CREATE TABLE IF NOT EXISTS autopilot.finding (
 );
 CREATE INDEX IF NOT EXISTS finding_run_idx ON autopilot.finding (run_id);
 CREATE INDEX IF NOT EXISTS finding_sev_idx ON autopilot.finding (severity, opportunity_value DESC);
+
+-- A target database Argus analyses. Managed from the Connectors UI; the daily
+-- run (--all-enabled) analyses every enabled connector.
+CREATE TABLE IF NOT EXISTS autopilot.connector (
+  id          BIGSERIAL PRIMARY KEY,
+  name        TEXT NOT NULL,
+  dbname      TEXT NOT NULL UNIQUE,
+  pg_user     TEXT NOT NULL DEFAULT 'mehdi',
+  kind        TEXT NOT NULL DEFAULT 'postgres',
+  enabled     BOOLEAN NOT NULL DEFAULT true,
+  last_status TEXT,
+  last_tested TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);

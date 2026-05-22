@@ -173,16 +173,34 @@ def run(target: str, n: int, use_narrative: bool) -> dict:
     return {"run_id": run_id, "memo": memo, "opp": opp, "risk": risk, "findings": findings}
 
 
+def enabled_targets() -> list[str]:
+    """Read enabled connectors from the argus DB (set via the UI)."""
+    try:
+        rows = store.pg("SELECT dbname FROM autopilot.connector WHERE enabled ORDER BY id;",
+                        capture=True)
+        return [r["dbname"] for r in rows]
+    except Exception:
+        return []
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--target", default="intigo")
     ap.add_argument("--n", type=int, default=8)
+    ap.add_argument("--all-enabled", action="store_true",
+                    help="analyse every enabled connector (from the Connectors UI)")
     ap.add_argument("--no-llm-narrative", action="store_true")
     ap.add_argument("--print-memo", action="store_true")
     args = ap.parse_args()
-    res = run(args.target, args.n, not args.no_llm_narrative)
-    if args.print_memo:
-        print(res["memo"])
+
+    targets = enabled_targets() if args.all_enabled else [args.target]
+    if not targets:
+        print("no enabled connectors — nothing to analyse", file=sys.stderr)
+        return
+    for t in targets:
+        res = run(t, args.n, not args.no_llm_narrative)
+        if args.print_memo:
+            print(res["memo"])
 
 
 if __name__ == "__main__":

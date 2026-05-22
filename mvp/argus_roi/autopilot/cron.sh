@@ -17,7 +17,6 @@ mkdir -p logs
 export ARGUS_PG_USER="${ARGUS_PG_USER:-$(whoami)}"
 export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
 
-TARGET="${1:-intigo}"
-echo "===== Argus autopilot @ $(date -Is) target=$TARGET ====="
-python3 autopilot.py --target "$TARGET" --n 8
+echo "===== Argus autopilot @ $(date -Is) (all enabled connectors) ====="
+python3 autopilot.py --all-enabled --n 8
 echo "===== done @ $(date -Is) ====="
