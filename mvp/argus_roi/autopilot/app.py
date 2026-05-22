@@ -53,26 +53,26 @@ def esc(s):
 
 # ---------- data ----------
 def latest_run():
-    r = store.pg("SELECT id,target_db,started_at,total_opportunity,total_at_risk,"
+    r = store.pgq("SELECT id,target_db,started_at,total_opportunity,total_at_risk,"
                  "playbooks_valid,memo_md,llm_model,llm_calls,tokens_in,tokens_out,cost_usd "
-                 "FROM autopilot.run WHERE status='succeeded' ORDER BY id DESC LIMIT 1;", capture=True)
+                 "FROM autopilot.run WHERE status='succeeded' ORDER BY id DESC LIMIT 1;")
     return r[0] if r else None
 
 
 def findings_for(run_id):
-    return store.pg("SELECT title,severity,headline,gross_value,opportunity_value,basis,"
+    return store.pgq("SELECT title,severity,headline,gross_value,opportunity_value,basis,"
                     "recommended_action,receipt_sql,metrics FROM autopilot.finding "
-                    f"WHERE run_id={int(run_id)} ORDER BY opportunity_value DESC;", capture=True)
+                    f"WHERE run_id={int(run_id)} ORDER BY opportunity_value DESC;")
 
 
 def runs_history():
-    return store.pg("SELECT id,target_db,started_at,total_opportunity,total_at_risk,playbooks_valid "
-                    "FROM autopilot.run WHERE status='succeeded' ORDER BY id DESC LIMIT 8;", capture=True)
+    return store.pgq("SELECT id,target_db,started_at,total_opportunity,total_at_risk,playbooks_valid "
+                    "FROM autopilot.run WHERE status='succeeded' ORDER BY id DESC LIMIT 8;")
 
 
 def connectors():
-    return store.pg("SELECT id,name,dbname,pg_user,enabled,last_status,last_tested "
-                    "FROM autopilot.connector ORDER BY id;", capture=True)
+    return store.pgq("SELECT id,name,dbname,pg_user,enabled,last_status,last_tested "
+                    "FROM autopilot.connector ORDER BY id;")
 
 
 def exec_summary(memo):
@@ -89,20 +89,20 @@ def get_crontab():
 
 
 def llm_calls_for(run_id):
-    return store.pg("SELECT purpose,model,tokens_in,tokens_out,latency_ms,cost_usd,ok "
-                    f"FROM autopilot.llm_call WHERE run_id={int(run_id)} ORDER BY id;", capture=True)
+    return store.pgq("SELECT purpose,model,tokens_in,tokens_out,latency_ms,cost_usd,ok "
+                    f"FROM autopilot.llm_call WHERE run_id={int(run_id)} ORDER BY id;")
 
 
 def usage_history():
-    return store.pg("SELECT id,target_db,started_at,llm_model,llm_calls,tokens_in,tokens_out,cost_usd "
+    return store.pgq("SELECT id,target_db,started_at,llm_model,llm_calls,tokens_in,tokens_out,cost_usd "
                     "FROM autopilot.run WHERE status='succeeded' AND llm_calls>0 "
-                    "ORDER BY id DESC LIMIT 12;", capture=True)
+                    "ORDER BY id DESC LIMIT 12;")
 
 
 def playbooks_db():
-    return store.pg("SELECT DISTINCT ON (playbook_key) playbook_key,title,kind,hypothesis,valid,"
+    return store.pgq("SELECT DISTINCT ON (playbook_key) playbook_key,title,kind,hypothesis,valid,"
                     "validation_note,generated_by,target_db,created_at FROM autopilot.playbook "
-                    "ORDER BY playbook_key, created_at DESC;", capture=True)
+                    "ORDER BY playbook_key, created_at DESC;")
 
 
 def playbooks_yaml():
@@ -367,7 +367,7 @@ finding in TND, and shows you a ranked report. You never write SQL or prompts.</
 
 # ---------- actions ----------
 def test_connector(cid):
-    rows = store.pg(f"SELECT dbname,pg_user FROM autopilot.connector WHERE id={int(cid)};", capture=True)
+    rows = store.pgq(f"SELECT dbname,pg_user FROM autopilot.connector WHERE id={int(cid)};")
     if not rows:
         return
     db, user = rows[0]["dbname"], rows[0]["pg_user"]

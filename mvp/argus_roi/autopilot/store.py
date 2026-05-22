@@ -42,6 +42,20 @@ def pg(sql: str, capture: bool = False) -> list[dict]:
     return [dict(zip(header, l.split("\t"))) for l in lines[1:]]
 
 
+def pgq(sql: str) -> list[dict]:
+    """Robust read: wrap the query in json_agg so multi-line text fields
+    (memo_md, receipt_sql, …) survive — the tab parser in pg() splits on
+    newlines and corrupts rows that contain them."""
+    wrapped = (f"SELECT COALESCE(json_agg(row_to_json(_q)), '[]') "
+               f"FROM ({sql.rstrip().rstrip(';')}) _q;")
+    proc = subprocess.run(
+        ["psql", ARGUS_PG_URL, "-tA", "--no-psqlrc", "-v", "ON_ERROR_STOP=1"],
+        input=wrapped, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"argus-pg error:\n{proc.stderr.strip()}")
+    return json.loads(proc.stdout.strip() or "[]")
+
+
 def dq(value) -> str:
     """Dollar-quote any string/json safely for inline SQL."""
     if value is None:
