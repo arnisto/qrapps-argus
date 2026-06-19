@@ -23,8 +23,10 @@
     "@argus/events": "workspace:*",
     "@argus/investigators": "workspace:*",
     "@argus/shared": "workspace:*",
+    "@fastify/cookie": "^9",
     "@fastify/cors": "^9.0.1",
     "@fastify/sensible": "^5.6.0",
+    "bcrypt": "^6.0.0",
     "bullmq": "^5.10.0",
     "fastify": "^4.28.0",
     "ioredis": "^5.4.0",
@@ -32,6 +34,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/pg": "^8.11.0",
     "tsx": "^4.7.0",
     "typescript": "^5.5.0",
