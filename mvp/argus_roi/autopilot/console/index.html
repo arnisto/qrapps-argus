@@ -65,7 +65,30 @@
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8.2" stroke="var(--accent,#2A6FDB)" stroke-width="1.6"/><circle cx="11" cy="11" r="3" fill="var(--accent,#2A6FDB)"/></svg>
       <span style="font-size:16px;font-weight:600;letter-spacing:-.01em;color:var(--text,#1b1a17);">Argus</span>
     </div>
-    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:500;letter-spacing:.02em;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);border:1px solid var(--border,#e6e2d9);padding:3px 8px;border-radius:5px;">self-hosted · single-tenant</span>
+    <div style="position:relative;">
+      <button onClick="{{ toggleProjectMenu }}" style="display:flex;align-items:center;gap:8px;border:1px solid var(--border,#e6e2d9);background:var(--surface-2,#faf8f4);cursor:pointer;font-family:inherit;padding:5px 11px;border-radius:8px;">
+        <span style="width:9px;height:9px;border-radius:3px;flex:none;background:{{ projectColor }};"></span>
+        <span style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);">{{ projectName }}</span>
+        <span style="font-size:10px;color:var(--text-3,#928e84);font-family:'IBM Plex Mono',monospace;">{{ projectKind }}</span>
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="var(--text-3,#928e84)" stroke-width="1.6"><path d="M3.5 5.5l3.5 3.5 3.5-3.5"/></svg>
+      </button>
+      <sc-if value="{{ projectOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;top:calc(100% + 6px);left:0;width:244px;z-index:30;background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:11px;box-shadow:var(--shadow);padding:5px;">
+          <div style="font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3,#928e84);padding:6px 9px 4px;">Businesses</div>
+          <sc-for list="{{ projectOptions }}" as="p" hint-placeholder-count="2">
+            <button onClick="{{ p.onClick }}" style="{{ p.style }}">
+              <span style="width:9px;height:9px;border-radius:3px;flex:none;background:{{ p.color }};"></span>
+              <span style="flex:1;text-align:left;">{{ p.name }}</span>
+              <span style="font-size:9.5px;color:var(--text-3,#928e84);font-family:'IBM Plex Mono',monospace;">{{ p.kind }}</span>
+              <sc-if value="{{ p.active }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="var(--accent,#2A6FDB)" stroke-width="2"><path d="M3 7.5l2.5 2.5 5.5-6"/></svg></sc-if>
+            </button>
+          </sc-for>
+          <div style="height:1px;background:var(--border,#e6e2d9);margin:5px 0;"></div>
+          <button onClick="{{ onNewProject }}" style="display:flex;align-items:center;gap:9px;width:100%;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;padding:8px 9px;border-radius:7px;background:transparent;color:var(--accent,#2A6FDB);">+ New business</button>
+        </div>
+      </sc-if>
+    </div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:500;letter-spacing:.02em;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);border:1px solid var(--border,#e6e2d9);padding:3px 8px;border-radius:5px;">self-hosted</span>
     <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:500;color:var(--accent,#2A6FDB);background:var(--accent-soft,#eaf1fc);padding:3px 8px;border-radius:5px;display:flex;align-items:center;gap:6px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--green,#1f8a5b);display:inline-block;"></span>LiteLLM → qwen2.5 · gpt-4o-mini</span>
     <div style="flex:1;"></div>
     <span style="font-size:11.5px;color:var(--text-3,#928e84);font-family:'IBM Plex Mono',monospace;">EN · العربية (RTL)</span>
@@ -201,7 +224,7 @@
       <div style="flex:1;overflow-y:auto;padding:30px 36px 60px;">
         <div style="max-width:920px;margin:0 auto;">
           <h1 style="font-size:22px;font-weight:600;color:var(--text,#1b1a17);margin:0 0 4px;letter-spacing:-.015em;">Good to see you, {{ greetingName }}</h1>
-          <p style="font-size:13.5px;color:var(--text-2,#5f5c54);margin:0 0 24px;">Here’s what your company brain is handling today.</p>
+          <p style="font-size:13.5px;color:var(--text-2,#5f5c54);margin:0 0 24px;">Here’s what {{ projectName }} is handling today.</p>
 
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-bottom:16px;">
             <sc-for list="{{ dashKpis }}" as="k" hint-placeholder-count="6">
@@ -1028,7 +1051,7 @@
             <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:18px;box-shadow:var(--shadow);">
               <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:10px;">Knowledge powering this API</div>
               <div style="font-size:12.5px;line-height:1.6;color:var(--text-2,#5f5c54);">142 files · orders_db · 37 answered questions</div>
-              <div style="font-size:11.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);margin-top:8px;">197 facts · indexed in pgvector + entity graph (PostgreSQL)</div>
+              <div style="font-size:11.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);margin-top:8px;">{{ apiFactsLine }}</div>
             </div>
             <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:18px;box-shadow:var(--shadow);">
               <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:12px;">Models you can target</div>
@@ -1260,6 +1283,22 @@
     </main>
   </div>
 
+  <!-- CREATE BUSINESS -->
+  <sc-if value="{{ creatingProject }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ cancelCreate }}" style="position:fixed;inset:0;z-index:50;background:rgba(20,18,12,.4);animation:argusFade .2s ease;"></div>
+  <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:51;width:440px;max-width:92vw;background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:16px;box-shadow:0 20px 60px -20px rgba(0,0,0,.5);padding:24px;animation:argusFade .25s ease;">
+    <h2 style="font-size:18px;font-weight:600;color:var(--text,#1b1a17);margin:0 0 4px;">New business</h2>
+    <p style="font-size:12.5px;color:var(--text-2,#5f5c54);margin:0 0 18px;line-height:1.5;">Argus spins up a fresh knowledge core, API and config for this workspace — fully isolated from your other businesses.</p>
+    <label style="display:block;font-size:11px;font-weight:600;color:var(--text-2,#5f5c54);margin-bottom:6px;">Business / project name</label>
+    <input type="text" value="{{ npName }}" onChange="{{ onNpName }}" placeholder="e.g. Speedo Delivery" style="width:100%;border:1px solid var(--border,#e6e2d9);background:var(--bg,#f4f2ee);border-radius:9px;padding:10px 12px;font-family:inherit;font-size:13.5px;color:var(--text,#1b1a17);outline:none;margin-bottom:16px;box-sizing:border-box;" />
+    <label style="display:block;font-size:11px;font-weight:600;color:var(--text-2,#5f5c54);margin-bottom:6px;">Type</label>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"><sc-for list="{{ npKindOptions }}" as="k" hint-placeholder-count="4"><button onClick="{{ k.onClick }}" style="{{ k.style }}">{{ k.name }}</button></sc-for></div>
+    <label style="display:block;font-size:11px;font-weight:600;color:var(--text-2,#5f5c54);margin-bottom:6px;">Primary model</label>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;"><sc-for list="{{ npModelOptions }}" as="m" hint-placeholder-count="3"><button onClick="{{ m.onClick }}" style="{{ m.style }}">{{ m.name }}</button></sc-for></div>
+    <div style="display:flex;gap:9px;"><button onClick="{{ createProject }}" style="border:none;cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:600;background:var(--accent,#2A6FDB);color:#fff;padding:10px 18px;border-radius:9px;">Create business</button><button onClick="{{ cancelCreate }}" style="border:1px solid var(--border,#e6e2d9);cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:600;background:var(--surface,#fff);color:var(--text,#1b1a17);padding:10px 18px;border-radius:9px;">Cancel</button></div>
+  </div>
+  </sc-if>
+
   <!-- TICKET DRAWER -->
   <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
   <div onClick="{{ td.onClose }}" style="position:fixed;inset:0;z-index:40;background:rgba(20,18,12,.35);animation:argusFade .2s ease;"></div>
@@ -1386,9 +1425,11 @@ class Component extends DCLogic {
     qaQ: '', qaA: '',
     guards: { pi: true, jail: true, strip: true, attach: true, pii_in: true, pii_out: true, secret: true, internal: true, ground: true, tone: false },
     apiTab: 'python',
-    apiKeys: [
-      { id: 'k1', label: 'Production', key: 'sk-argus-7f3a9c2e4b81', masked: true, created: '12 days ago' },
-      { id: 'k2', label: 'Local dev', key: 'sk-argus-localdev0099', masked: true, created: '3 days ago' },
+    project: 'p1', projectOpen: false, creatingProject: false,
+    np: { name: '', kind: 'Delivery', model: 'gpt-4o-mini' },
+    projects: [
+      { id: 'p1', name: 'Speedo Delivery', kind: 'Delivery', color: '#c2742e', slug: 'speedo', model: 'gpt-4o-mini', facts: 197, keys: [{ id: 'k1', label: 'Production', key: 'sk-argus-speedo-7f3a9c2e', masked: true, created: '12 days ago' }, { id: 'k2', label: 'Local dev', key: 'sk-argus-speedo-dev0099', masked: true, created: '3 days ago' }] },
+      { id: 'p2', name: 'Nexa IT', kind: 'IT services', color: '#2A6FDB', slug: 'nexa-it', model: 'qwen2.5:14b', facts: 84, keys: [{ id: 'k1', label: 'Production', key: 'sk-argus-nexa-22b1c7', masked: true, created: '5 days ago' }] },
     ],
     taught: [
       { kind: 'file', label: 'shipping-policy.pdf', detail: '12 facts extracted', time: '3d ago' },
@@ -1529,9 +1570,25 @@ class Component extends DCLogic {
   }
   setApiTab(t) { this.setState({ apiTab: t }); }
   copyFlash(label) { try { if (navigator.clipboard) navigator.clipboard.writeText(label); } catch (e) {} this.flash('Copied to clipboard'); }
-  toggleKeyReveal(id) { this.setState({ apiKeys: this.state.apiKeys.map(k => k.id === id ? { ...k, masked: !k.masked } : k) }); }
-  rotateKey(id) { const nv = 'sk-argus-' + Math.random().toString(36).slice(2, 14); this.setState({ apiKeys: this.state.apiKeys.map(k => k.id === id ? { ...k, key: nv, masked: false } : k) }); this.flash('API key rotated'); }
-  createKey() { const nv = 'sk-argus-' + Math.random().toString(36).slice(2, 14); this.setState({ apiKeys: [...this.state.apiKeys, { id: 'k' + Date.now(), label: 'New key', key: nv, masked: false, created: 'just now' }] }); this.flash('API key created'); }
+  curProject() { return this.state.projects.find(p => p.id === this.state.project) || this.state.projects[0]; }
+  updateKeys(fn) { this.setState({ projects: this.state.projects.map(p => p.id === this.state.project ? { ...p, keys: fn(p.keys) } : p) }); }
+  toggleKeyReveal(id) { this.updateKeys(keys => keys.map(k => k.id === id ? { ...k, masked: !k.masked } : k)); }
+  rotateKey(id) { const slug = this.curProject().slug; const nv = 'sk-argus-' + slug.slice(0, 6) + '-' + Math.random().toString(36).slice(2, 10); this.updateKeys(keys => keys.map(k => k.id === id ? { ...k, key: nv, masked: false } : k)); this.flash('API key rotated'); }
+  createKey() { const slug = this.curProject().slug; const nv = 'sk-argus-' + slug.slice(0, 6) + '-' + Math.random().toString(36).slice(2, 10); this.updateKeys(keys => [...keys, { id: 'k' + Date.now(), label: 'New key', key: nv, masked: false, created: 'just now' }]); this.flash('API key created'); }
+  setProject(id) { this.setState({ project: id, projectOpen: false, openTicket: null }); }
+  toggleProjectMenu() { this.setState({ projectOpen: !this.state.projectOpen }); }
+  toggleCreate() { this.setState({ creatingProject: !this.state.creatingProject, projectOpen: false, np: { name: '', kind: 'Delivery', model: 'gpt-4o-mini' } }); }
+  setNp(patch) { this.setState({ np: { ...this.state.np, ...patch } }); }
+  createProject() {
+    const np = this.state.np; if (!np.name.trim()) { this.flash('Name your business first'); return; }
+    const slug = np.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'workspace';
+    const colors = ['#1F8A5B', '#6b5bd6', '#c2742e', '#2A6FDB'];
+    const color = colors[this.state.projects.length % colors.length];
+    const id = 'p' + Date.now();
+    const proj = { id, name: np.name.trim(), kind: np.kind, color, slug, model: np.model, facts: 0, keys: [{ id: 'k1', label: 'Production', key: 'sk-argus-' + slug.slice(0, 6) + '-' + Math.random().toString(36).slice(2, 8), masked: false, created: 'just now' }] };
+    this.setState({ projects: [...this.state.projects, proj], project: id, creatingProject: false });
+    this.flash('Created ' + proj.name + ' — knowledge core & API ready');
+  }
 
   toggleGuard(id) { const g = { ...this.state.guards, [id]: !(this.state.guards[id] !== false) }; this.setState({ guards: g }); this.flash((g[id] ? 'Enabled' : 'Disabled') + ' interceptor'); }
 
@@ -2004,7 +2061,13 @@ class Component extends DCLogic {
     }));
 
     // ===== developer API =====
-    const baseUrl = 'https://argus.local/v1';
+    const cur = s.projects.find(p => p.id === s.project) || s.projects[0];
+    const baseUrl = 'https://argus.local/' + cur.slug + '/v1';
+    const projectName = cur.name, projectKind = cur.kind, projectColor = cur.color;
+    const apiFactsLine = cur.facts + ' facts · indexed in pgvector + entity graph (PostgreSQL)';
+    const projectOptions = s.projects.map(p => ({ name: p.name, kind: p.kind, color: p.color, active: p.id === s.project, onClick: () => this.setProject(p.id), style: 'display:flex;align-items:center;gap:9px;width:100%;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:' + (p.id === s.project ? 600 : 500) + ';padding:8px 9px;border-radius:7px;background:' + (p.id === s.project ? 'var(--accent-soft,#eaf1fc)' : 'transparent') + ';color:var(--text,#1b1a17);' }));
+    const npKindOptions = ['Delivery', 'IT services', 'Retail', 'Other'].map(k => ({ name: k, onClick: () => this.setNp({ kind: k }), style: 'border:1px solid ' + (s.np.kind === k ? 'var(--accent,#2A6FDB)' : 'var(--border,#e6e2d9)') + ';cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;padding:7px 12px;border-radius:8px;background:' + (s.np.kind === k ? 'var(--accent-soft,#eaf1fc)' : 'var(--surface,#fff)') + ';color:' + (s.np.kind === k ? 'var(--accent,#2A6FDB)' : 'var(--text-2,#5f5c54)') + ';' }));
+    const npModelOptions = ['gpt-4o-mini', 'qwen2.5:14b', 'llama-3.3-70b'].map(m => ({ name: m, onClick: () => this.setNp({ model: m }), style: "border:1px solid " + (s.np.model === m ? 'var(--accent,#2A6FDB)' : 'var(--border,#e6e2d9)') + ";cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;padding:7px 11px;border-radius:8px;background:" + (s.np.model === m ? 'var(--accent-soft,#eaf1fc)' : 'var(--surface,#fff)') + ";color:" + (s.np.model === m ? 'var(--accent,#2A6FDB)' : 'var(--text-2,#5f5c54)') + ";" }));
     const apiTabs = [['curl', 'cURL'], ['python', 'Python'], ['js', 'JavaScript']].map(([id, label]) => ({
       label, onClick: () => this.setApiTab(id),
       style: "border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;padding:6px 13px;border-radius:7px;" + (s.apiTab === id ? 'background:var(--surface,#fff);color:var(--text,#1b1a17);box-shadow:0 1px 2px rgba(0,0,0,.1);' : 'background:transparent;color:var(--text-3,#928e84);'),
@@ -2016,7 +2079,7 @@ class Component extends DCLogic {
     };
     const apiCode = codeSamples[s.apiTab] || codeSamples.python;
     const respSample = '{\n  "choices": [{\n    "message": {\n      "role": "assistant",\n      "content": "Yes — we ship to Germany. Standard EU\\n                  delivery is 4–7 business days via DHL."\n    }\n  }],\n  "citations": [\n    { "source": "shipping-policy.pdf", "type": "file", "confidence": 0.96 }\n  ],\n  "grounded": true\n}';
-    const apiKeys = s.apiKeys.map(k => ({
+    const apiKeys = cur.keys.map(k => ({
       label: k.label, created: k.created, masked: k.masked,
       shown: k.masked ? (k.key.slice(0, 11) + '••••••' + k.key.slice(-3)) : k.key,
       revealLabel: k.masked ? 'Reveal' : 'Hide',
@@ -2102,7 +2165,7 @@ class Component extends DCLogic {
       { label: 'Open gaps', value: String(gapsOpen), sub: 'interview loop', color: 'var(--red,#bb3a2c)', onClick: () => this.setNav('gaps') },
       { label: 'Threats blocked', value: '11', sub: 'today', color: 'var(--green,#1f8a5b)', onClick: () => this.setNav('security') },
       { label: 'Avg confidence', value: '89%', sub: 'last 100 drafts', color: 'var(--accent,#2A6FDB)', onClick: () => this.setNav('inbox') },
-      { label: 'Knowledge facts', value: '197', sub: 'grounded', color: '#6b5bd6', onClick: () => this.setNav('know') },
+      { label: 'Knowledge facts', value: String(cur.facts), sub: 'grounded', color: '#6b5bd6', onClick: () => this.setNav('know') },
     ].map(k => ({ ...k, cardStyle: kpiCard }));
     const dayData = [['M', 8], ['T', 12], ['W', 6], ['T', 15], ['F', 11], ['S', 4], ['S', 2]];
     const dashBars = dayData.map(([d, v]) => ({ d, v: String(v), h: Math.round(v / 15 * 100) + '%' }));
@@ -2139,7 +2202,9 @@ class Component extends DCLogic {
     return {
       rootStyle, lightBtn, darkBtn, setLight: () => this.toggleTheme('light'), setDark: () => this.toggleTheme('dark'),
       ns, navDashboard: () => this.setNav('dashboard'), isDashboard: s.nav === 'dashboard', dashKpis, dashBars, dashChannels, recentActivity, greetingName: 'Lamjed',
-      navInbox: () => this.setNav('inbox'), navChat: () => this.setNav('chat'), navPipelines: () => this.setNav('pipelines'), navMembers: () => this.setNav('members'), navConnectors: () => this.setNav('connectors'), navModels: () => this.setNav('models'), navApi: () => this.setNav('api'), isApi: s.nav === 'api', apiTabs, apiCode, respSample, apiKeys, apiEndpoints, apiModels, apiFlow, baseUrl, onCopyBase: () => this.copyFlash(baseUrl), createKey: () => this.createKey(),
+      navInbox: () => this.setNav('inbox'), navChat: () => this.setNav('chat'), navPipelines: () => this.setNav('pipelines'), navMembers: () => this.setNav('members'), navConnectors: () => this.setNav('connectors'), navModels: () => this.setNav('models'), navApi: () => this.setNav('api'), isApi: s.nav === 'api', apiTabs, apiCode, respSample, apiKeys, apiEndpoints, apiModels, apiFlow, baseUrl, onCopyBase: () => this.copyFlash(baseUrl), createKey: () => this.createKey(), apiFactsLine,
+      projectName, projectKind, projectColor, projectOpen: s.projectOpen, toggleProjectMenu: () => this.toggleProjectMenu(), projectOptions, onNewProject: () => this.toggleCreate(),
+      creatingProject: s.creatingProject, cancelCreate: () => this.toggleCreate(), npName: s.np.name, onNpName: (e) => this.setNp({ name: e.target.value }), npKindOptions, npModelOptions, createProject: () => this.createProject(),
       navAgents: () => this.setNav('agents'), navChannels: () => this.setNav('channels'), navKnow: () => this.setNav('know'), navTeach: () => this.setNav('teach'), navGaps: () => this.setNav('gaps'), navSecurity: () => this.setNav('security'), navAudit: () => this.setNav('audit'), navSettings: () => this.setNav('settings'),
       inboundGuards, outboundGuards, secEvents, secMetrics, isSecurity: s.nav === 'security',
       needsCount, gapsOpen, badgeNeeds, badgeGaps, badgeModels, connectedCount, badgePipelines, openTicketsCount,
