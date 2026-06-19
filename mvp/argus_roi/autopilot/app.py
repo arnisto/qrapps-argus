@@ -17,16 +17,23 @@ Everything reads/writes the live `argus` Postgres and the user's crontab.
 
 from __future__ import annotations
 
+import cgi
 import glob
 import html
+import io
 import json
 import subprocess
 import sys
+import tempfile
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import store
+from engine import providers as ke_providers
+from engine import ingest as ke_ingest
+from engine import keys as ke_keys
+from engine import chat as ke_chat
 
 try:
     import yaml
@@ -365,6 +372,242 @@ finding in TND, and shows you a ranked report. You never write SQL or prompts.</
     return page("help", body)
 
 
+# ============================================================================
+#  WORKING KNOWLEDGE-ENGINE PAGES  (separate from the Claude design preview)
+# ============================================================================
+
+def _ke_chrome(active: str, body: str) -> str:
+    nav_items = [
+        ("teach",      "/teach",      "Teach"),
+        ("models",     "/models",     "Models"),
+        ("api",        "/api",        "Developer API"),
+        ("playground", "/playground", "Playground"),
+    ]
+    nav = " · ".join(
+        f'<a href="{href}" style="color:{"#3b82f6" if active==key else "#94a3b8"};text-decoration:none;font-weight:{600 if active==key else 500};">{label}</a>'
+        for key, href, label in nav_items)
+    return f"""<!doctype html><html><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Argus · {active}</title>
+<style>
+*{{box-sizing:border-box}}body{{margin:0;background:#0b0f17;color:#e6edf3;
+font:14px/1.55 ui-sans-serif,system-ui,sans-serif}}
+header{{display:flex;align-items:center;gap:18px;padding:13px 22px;border-bottom:1px solid #1f2937;background:#0d1320;position:sticky;top:0;z-index:9}}
+header .brand{{font-weight:700;font-size:16px}}
+header a:hover{{color:#cdd9e5!important}}
+.wrap{{max-width:980px;margin:0 auto;padding:22px 20px 80px}}
+h1{{font-size:20px;margin:0 0 6px}}.muted{{color:#8b97a7;font-size:13px}}
+.card{{background:#121826;border:1px solid #1f2937;border-radius:12px;padding:16px;margin:14px 0}}
+.card h2{{margin:0 0 10px;font-size:15px;color:#cdd9e5}}
+table{{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}}
+td,th{{padding:8px 10px;border-bottom:1px solid #1f2937;text-align:left;vertical-align:top}}.r{{text-align:right}}
+input,select,textarea{{background:#0a0e15;border:1px solid #2a3647;color:#e6edf3;border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit;width:100%}}
+textarea{{min-height:90px}}
+button,.btn{{background:#1d4ed8;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer}}
+button.sec{{background:#243044}}button.danger{{background:#7f1d1d}}
+.kv{{display:grid;grid-template-columns:140px 1fr;gap:8px 12px;font-size:13px}}.kv b{{color:#cdd9e5}}
+.row{{display:flex;gap:8px;align-items:center;flex-wrap:wrap}}
+.pill{{font-size:11px;padding:2px 8px;border-radius:999px;background:#1d4ed8;color:#fff}}
+.pill.gray{{background:#243044;color:#cdd9e5}}
+pre{{background:#0a0e15;border:1px solid #1f2937;border-radius:8px;padding:11px;overflow:auto;font-size:12px;color:#9fe8c0;white-space:pre-wrap;word-break:break-all}}
+form.inline{{display:inline}} a{{color:#60a5fa;text-decoration:none}}
+.warn{{background:#3a2030;color:#fca5a5;padding:8px 12px;border-radius:8px;font-size:13px;margin:8px 0}}
+.ok{{background:#0b3322;color:#34d399;padding:8px 12px;border-radius:8px;font-size:13px;margin:8px 0}}
+</style></head><body>
+<header><span class=brand>🛰️ Argus</span>
+<a href="/" style="color:#94a3b8;text-decoration:none">design preview</a>
+<span style="color:#3a4452">·</span>{nav}
+<span style="margin-left:auto" class=muted>knowledge layer · /v1 API</span></header>
+<div class=wrap>{body}</div></body></html>"""
+
+
+def _human_bytes(n):
+    if not n: return "—"
+    for u in ("B", "KB", "MB", "GB"):
+        if n < 1024: return f"{n:.0f} {u}"
+        n /= 1024
+    return f"{n:.1f} TB"
+
+
+def view_teach():
+    sources = ke_ingest.list_sources("default")
+    rows = ""
+    for s in sources:
+        kind_pill = '<span class="pill gray">file</span>' if s["kind"] == "file" else \
+                    '<span class="pill" style="background:#064e3b;color:#34d399">Q&A</span>'
+        rows += (f"<tr><td>{kind_pill}</td><td><b>{esc(s['title'])}</b><div class=muted>"
+                 f"{esc(s.get('uri') or '')}</div></td>"
+                 f"<td>{int(s.get('chunks',0))}</td>"
+                 f"<td>{_human_bytes(s.get('bytes') or 0)}</td>"
+                 f"<td>{esc(s['created_at'][:16])}</td>"
+                 f"<td><form class=inline method=post action=/teach/delete onsubmit=\"return confirm('Delete?')\">"
+                 f"<input type=hidden name=id value={s['id']}><button class=danger>Delete</button></form></td></tr>")
+
+    body = f"""<h1>Teach Argus</h1>
+<p class=muted>Upload files (PDF / MD / TXT / HTML) or add answered Q&A. Each one is chunked, embedded with Gemini text-embedding-004, and indexed in pgvector. Anything you teach is then available to <code>/v1/chat</code>.</p>
+
+<div class=card><h2>Upload a file</h2>
+<form method=post action=/teach/upload enctype=multipart/form-data class=row>
+<input type=file name=file required style="max-width:380px">
+<button>Ingest file</button>
+</form>
+<div class=muted style="margin-top:6px">PDFs require <code>pypdf</code> in the runtime. Otherwise: txt/md/markdown/html.</div></div>
+
+<div class=card><h2>Add an answered Q&A</h2>
+<form method=post action=/teach/qa>
+<div style="display:grid;gap:8px">
+<input name=question placeholder="Question (what customers ask)" required>
+<textarea name=answer placeholder="The grounded answer (becomes a high-authority fact)" required></textarea>
+<div><button>Add Q&A</button></div>
+</div></form></div>
+
+<div class=card><h2>Sources ({len(sources)})</h2>
+<table><tr><th>Kind</th><th>Title</th><th>Chunks</th><th>Size</th><th>Added</th><th></th></tr>
+{rows or '<tr><td colspan=6 class=muted style="text-align:center;padding:24px">Nothing yet — upload a file above.</td></tr>'}
+</table></div>"""
+    return _ke_chrome("teach", body)
+
+
+def view_models():
+    rows = ""
+    for p in ke_providers.list_providers("default"):
+        enabled = '<span class="pill" style="background:#064e3b;color:#34d399">enabled</span>' if (p["enabled"] in ("t", True, "true")) else '<span class="pill" style="background:#3a2030;color:#fca5a5">off</span>'
+        rows += (f"<tr><td><b>{esc(p['name'])}</b></td><td>{esc(p['default_model'])}</td>"
+                 f"<td>{esc(p.get('base_url') or '—')}</td><td>{enabled}</td>"
+                 f"<td>{esc(p['created_at'][:16])}</td>"
+                 f"<td><a class=btn href='/v1/providers/test/{p['name']}' target=_blank>Test</a> "
+                 f"<form class=inline method=post action=/models/delete onsubmit=\"return confirm('Delete provider?')\">"
+                 f"<input type=hidden name=id value={p['id']}><button class=danger>Delete</button></form></td></tr>")
+
+    body = f"""<h1>Models</h1>
+<p class=muted>Connect any LLM provider. Argus stores the API key encrypted (AES-GCM via APP_SECRET). Same model goes through Argus on every /v1/chat call — Argus just injects your knowledge.</p>
+
+<div class=card><h2>Connect a provider</h2>
+<form method=post action=/models/add>
+<div style="display:grid;gap:8px;grid-template-columns:1fr 1fr">
+  <label>Name <select name=name>
+    <option value=gemini>gemini</option>
+    <option value=groq>groq</option>
+    <option value=openai>openai</option></select></label>
+  <label>API key <input name=api_key required type=password placeholder="paste API key"></label>
+  <label>Default model <input name=default_model required value="gemini-2.5-flash" placeholder="e.g. gemini-2.5-flash, llama-3.1-70b-versatile, gpt-4o-mini"></label>
+  <label>Base URL (optional) <input name=base_url placeholder="leave empty for default"></label>
+</div>
+<div style="margin-top:8px"><button>Connect</button></div>
+</form>
+<div class=muted style="margin-top:6px">Gemini is also used for embeddings (text-embedding-004, 768-dim). Add Gemini first so ingestion works.</div></div>
+
+<div class=card><h2>Connected providers</h2>
+<table><tr><th>Provider</th><th>Default model</th><th>Base URL</th><th></th><th>Added</th><th></th></tr>
+{rows or '<tr><td colspan=6 class=muted style="text-align:center;padding:24px">No providers yet.</td></tr>'}
+</table></div>"""
+    return _ke_chrome("models", body)
+
+
+def view_api(revealed_key: str | None = None):
+    keys = ke_keys.list_keys("default")
+    reqs = ke_chat.list_requests("default", limit=20)
+
+    krows = ""
+    for k in keys:
+        active = (k["enabled"] in ("t", True, "true"))
+        pill = '<span class="pill" style="background:#064e3b;color:#34d399">active</span>' if active else '<span class="pill" style="background:#3a2030;color:#fca5a5">revoked</span>'
+        krows += (f"<tr><td><b>{esc(k['name'])}</b></td>"
+                  f"<td><code>{esc(k['key_prefix'])}</code></td>"
+                  f"<td>{pill}</td>"
+                  f"<td>{int(k.get('rate_per_min') or 0)}/min</td>"
+                  f"<td>{esc(k['created_at'][:16])}</td>"
+                  f"<td>{esc((k.get('last_used_at') or '')[:16] or '—')}</td>"
+                  f"<td><form class=inline method=post action=/api/revoke-key><input type=hidden name=id value={k['id']}><button class=sec>Revoke</button></form></td></tr>")
+
+    reveal_box = ""
+    if revealed_key:
+        reveal_box = (f"<div class=ok><b>Save this key now</b> — it's only shown once. "
+                      f"<br><pre style='margin-top:6px'>{esc(revealed_key)}</pre></div>")
+
+    rrows = ""
+    for r in reqs:
+        rrows += (f"<tr><td>{esc(r['created_at'][:16])}</td>"
+                  f"<td>{esc(r['provider'])}/{esc(r['model'])}</td>"
+                  f"<td>{esc(r.get('apikey_name') or '—')}</td>"
+                  f"<td class=r>{int(r.get('prompt_tokens') or 0)} → {int(r.get('completion_tokens') or 0)}</td>"
+                  f"<td class=r>{int(r.get('latency_ms') or 0)} ms</td>"
+                  f"<td class=r>${float(r.get('cost_usd') or 0):.5f}</td>"
+                  f"<td class=r>{int(r.get('chunks_used') or 0)}</td>"
+                  f"<td>{esc(r['status'])}</td></tr>")
+
+    body = f"""<h1>Developer API</h1>
+<p class=muted>Use the same models you connected, but through Argus — every call gets your knowledge injected, with citations. <b>OpenAI-compatible</b>: drop into any client by setting <code>baseUrl = http://localhost:8090/v1</code> and using an Argus API key.</p>
+
+{reveal_box}
+
+<div class=card><h2>API keys</h2>
+<form method=post action=/api/create-key class=row style="margin-bottom:10px">
+<input name=name placeholder="key name (e.g. 'My App Prod')" required style="max-width:280px">
+<button>Create new key</button>
+</form>
+<table><tr><th>Name</th><th>Prefix</th><th></th><th>Rate</th><th>Created</th><th>Last used</th><th></th></tr>
+{krows or '<tr><td colspan=7 class=muted style="text-align:center;padding:24px">No keys yet.</td></tr>'}
+</table></div>
+
+<div class=card><h2>Use the API</h2>
+<h3 style="font-size:13px;margin:10px 0 4px;color:#cdd9e5">curl</h3>
+<pre>curl http://localhost:8090/v1/chat/completions \\
+  -H "Authorization: Bearer $ARGUS_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{{
+    "model": "gemini-2.5-flash",
+    "messages": [{{"role": "user", "content": "What is your refund policy?"}}]
+  }}'</pre>
+<h3 style="font-size:13px;margin:14px 0 4px;color:#cdd9e5">Python (openai SDK — same call, swapped baseUrl)</h3>
+<pre>from openai import OpenAI
+client = OpenAI(api_key="ak_live_…", base_url="http://localhost:8090/v1")
+resp = client.chat.completions.create(
+    model="gemini-2.5-flash",
+    messages=[{{"role": "user", "content": "What is your refund policy?"}}],
+)
+print(resp.choices[0].message.content)
+print(resp.argus_citations)   # which chunks were used</pre>
+<div class=muted>The response shape mirrors OpenAI exactly, plus an <code>argus_citations</code> array naming the chunks used to ground the answer. <code>argus_warning: "no_grounded_context"</code> appears when retrieval returned nothing relevant.</div></div>
+
+<div class=card><h2>Recent requests ({len(reqs)})</h2>
+<table><tr><th>When</th><th>Model</th><th>Key</th><th class=r>Tokens</th><th class=r>Latency</th><th class=r>Cost</th><th class=r>Chunks</th><th>Status</th></tr>
+{rrows or '<tr><td colspan=8 class=muted style="text-align:center;padding:24px">No requests yet.</td></tr>'}
+</table></div>"""
+    return _ke_chrome("api", body)
+
+
+def view_playground(prompt: str = "", model: str = "gemini-2.5-flash",
+                    answer: str | None = None, citations: list | None = None):
+    provs = ke_providers.list_providers("default")
+    model_opts = "".join(f'<option value="{esc(p["default_model"])}" {"selected" if p["default_model"]==model else ""}>{esc(p["name"])} → {esc(p["default_model"])}</option>'
+                          for p in provs) or '<option value="">(no providers connected — visit /models)</option>'
+    cit_html = ""
+    if citations:
+        rows = "".join(f"<tr><td>[#{i+1}]</td><td>{esc(c['source_title'])}</td><td>{esc(c.get('source_kind') or '')}</td><td class=r>{c['score']:.3f}</td></tr>"
+                        for i, c in enumerate(citations))
+        cit_html = f"<div class=card><h2>Citations</h2><table><tr><th></th><th>Source</th><th>Kind</th><th class=r>Score</th></tr>{rows}</table></div>"
+    elif answer is not None:
+        cit_html = "<div class=warn>No grounded context retrieved — the model answered without your knowledge.</div>"
+    ans_html = ""
+    if answer is not None:
+        ans_html = f"<div class=card><h2>Answer</h2><pre style='color:#e6edf3;white-space:pre-wrap'>{esc(answer)}</pre></div>{cit_html}"
+    body = f"""<h1>Playground</h1>
+<p class=muted>Try Argus end-to-end: pick a connected model, ask a question, see the answer + which chunks grounded it.</p>
+<div class=card><form method=post action=/playground/run>
+<label>Model <select name=model>{model_opts}</select></label>
+<div style="margin-top:8px"><label>Question <textarea name=q placeholder="Ask anything about what you've taught Argus.">{esc(prompt)}</textarea></label></div>
+<div style="margin-top:8px"><button>Ask</button></div>
+</form></div>
+{ans_html}"""
+    return _ke_chrome("playground", body)
+
+
+# ============================================================================
+#  AUTOPILOT PAGES (existing — preserved under /old/*)
+# ============================================================================
+
+
 # ---------- actions ----------
 def test_connector(cid):
     rows = store.pgq(f"SELECT dbname,pg_user FROM autopilot.connector WHERE id={int(cid)};")
@@ -425,16 +668,59 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _json(self, obj, code=200):
+        data = json.dumps(obj, default=str).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _bearer(self) -> str | None:
+        auth = self.headers.get("Authorization", "")
+        return auth[7:].strip() if auth.startswith("Bearer ") else None
+
+    def _require_apikey(self):
+        info = ke_keys.verify(self._bearer() or "")
+        if not info:
+            self._json({"error": {"message": "missing or invalid bearer token", "type": "auth"}}, 401)
+            return None
+        return info
+
     def do_GET(self):
         try:
-            # NEW UI: the imported Claude Console design served as static files.
-            # `/` IS the new console; the prior real-data pages move under /old/*.
             console_dir = HERE / "console"
+            # ----- Claude design preview (the polished mockup) -----
             if self.path in ("/", "/index.html", "/console", "/console/", "/console/index.html"):
                 self._send_static(console_dir / "index.html", "text/html; charset=utf-8")
             elif self.path in ("/support.js", "/console/support.js"):
                 self._send_static(console_dir / "support.js", "application/javascript; charset=utf-8")
-            # Old real-data pages remain accessible at /old/...
+            # ----- Working knowledge-engine UI -----
+            elif self.path == "/teach":
+                self._send(view_teach())
+            elif self.path == "/models":
+                self._send(view_models())
+            elif self.path == "/api" or self.path.startswith("/api?"):
+                qs = urllib.parse.urlparse(self.path).query
+                params = urllib.parse.parse_qs(qs)
+                self._send(view_api(revealed_key=(params.get("revealed_key") or [None])[0]))
+            elif self.path == "/playground":
+                self._send(view_playground())
+            # ----- Developer JSON API (Bearer-authed) -----
+            elif self.path == "/v1/sources":
+                if self._require_apikey() is None: return
+                self._json({"sources": ke_ingest.list_sources("default")})
+            elif self.path == "/v1/keys":
+                # admin: list keys (no bearer required for now — local single-tenant)
+                self._json({"keys": ke_keys.list_keys("default")})
+            elif self.path == "/v1/providers":
+                self._json({"providers": ke_providers.list_providers("default")})
+            elif self.path == "/v1/requests":
+                self._json({"requests": ke_chat.list_requests("default", limit=50)})
+            elif self.path.startswith("/v1/providers/test/"):
+                name = self.path.rsplit("/", 1)[-1]
+                self._json(ke_providers.test_provider("default", name))
+            # ----- Old real-data autopilot pages -----
             elif self.path == "/old" or self.path == "/old/":
                 self._send(view_reports())
             elif self.path == "/old/connectors":
@@ -454,29 +740,159 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
-            f = self._form()
+            ctype = self.headers.get("Content-Type", "")
+            is_v1 = self.path.startswith("/v1/")
+
+            # ---------- Developer JSON API ----------
+            if self.path == "/v1/chat/completions":
+                # OpenAI-compatible. Bearer required.
+                info = self._require_apikey()
+                if info is None: return
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode())
+                model = body.get("model") or "gemini-2.5-flash"
+                msgs = body.get("messages") or []
+                k = int(((body.get("argus") or {}).get("k")) or 8)
+                opts = {kk: body[kk] for kk in ("temperature", "max_tokens") if kk in body}
+                try:
+                    out = ke_chat.chat(info["tenant_id"], model, msgs,
+                                        k=k, apikey_id=int(info["id"]), **opts)
+                    self._json(out)
+                except Exception as ex:
+                    self._json({"error": {"message": str(ex), "type": "provider_error"}}, 502)
+                return
+
+            if self.path == "/v1/providers":
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode())
+                pid = ke_providers.add_provider(
+                    "default", body["name"], body["api_key"], body["default_model"],
+                    body.get("base_url"))
+                self._json({"id": pid, "name": body["name"], "default_model": body["default_model"]})
+                return
+
+            if self.path.startswith("/v1/providers/delete/"):
+                pid = int(self.path.rsplit("/", 1)[-1])
+                ke_providers.delete_provider("default", pid)
+                self._json({"ok": True})
+                return
+
+            if self.path == "/v1/ingest":
+                # Two flavours: multipart file upload, OR JSON Q&A.
+                if ctype.startswith("multipart/"):
+                    form = cgi.FieldStorage(
+                        fp=self.rfile, headers=self.headers,
+                        environ={"REQUEST_METHOD": "POST", "CONTENT_TYPE": ctype})
+                    field = form["file"] if "file" in form else None
+                    if field is None or not getattr(field, "filename", None):
+                        self._json({"error": {"message": "field 'file' missing"}}, 400); return
+                    tmp = Path(tempfile.gettempdir()) / field.filename
+                    tmp.write_bytes(field.file.read())
+                    result = ke_ingest.ingest_file("default", tmp,
+                                                    title=field.filename,
+                                                    mime=field.type,
+                                                    added_by="ui")
+                    self._json(result); return
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode())
+                if body.get("kind") == "qa":
+                    self._json(ke_ingest.ingest_qa("default", body["question"], body["answer"],
+                                                    added_by=body.get("added_by", "ui")))
+                else:
+                    self._json({"error": {"message": "unknown ingest kind"}}, 400)
+                return
+
+            if self.path == "/v1/keys":
+                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode())
+                k = ke_keys.generate("default", body.get("name", "unnamed"),
+                                      scopes=body.get("scopes"),
+                                      rate_per_min=int(body.get("rate_per_min", 60)))
+                self._json(k); return
+
+            if self.path.startswith("/v1/keys/revoke/"):
+                ke_keys.revoke("default", int(self.path.rsplit("/", 1)[-1]))
+                self._json({"ok": True}); return
+            if self.path.startswith("/v1/keys/delete/"):
+                ke_keys.delete("default", int(self.path.rsplit("/", 1)[-1]))
+                self._json({"ok": True}); return
+            if self.path.startswith("/v1/sources/delete/"):
+                ke_ingest.delete_source("default", int(self.path.rsplit("/", 1)[-1]))
+                self._json({"ok": True}); return
+
+            # ---------- Working UI form actions ----------
+            f = self._form() if ctype.startswith("application/x-www-form-urlencoded") else {}
+
+            if self.path == "/teach/upload":
+                form = cgi.FieldStorage(
+                    fp=self.rfile, headers=self.headers,
+                    environ={"REQUEST_METHOD": "POST", "CONTENT_TYPE": ctype})
+                field = form["file"] if "file" in form else None
+                if field is not None and getattr(field, "filename", None):
+                    tmp = Path(tempfile.gettempdir()) / field.filename
+                    tmp.write_bytes(field.file.read())
+                    ke_ingest.ingest_file("default", tmp,
+                                            title=field.filename, mime=field.type, added_by="ui")
+                self._redirect("/teach"); return
+
+            if self.path == "/teach/qa":
+                ke_ingest.ingest_qa("default", f.get("question", ""), f.get("answer", ""), "ui")
+                self._redirect("/teach"); return
+            if self.path == "/teach/delete":
+                ke_ingest.delete_source("default", int(f["id"])); self._redirect("/teach"); return
+
+            if self.path == "/models/add":
+                ke_providers.add_provider("default", f["name"], f["api_key"],
+                                            f["default_model"], f.get("base_url") or None)
+                self._redirect("/models"); return
+            if self.path == "/models/delete":
+                ke_providers.delete_provider("default", int(f["id"])); self._redirect("/models"); return
+
+            if self.path == "/api/create-key":
+                k = ke_keys.generate("default", f.get("name", "key"))
+                # surface the plaintext via querystring so /api shows it once
+                self._redirect(f"/api?revealed_id={k['id']}&revealed_key={urllib.parse.quote(k['key'])}")
+                return
+            if self.path == "/api/revoke-key":
+                ke_keys.revoke("default", int(f["id"])); self._redirect("/api"); return
+
+            if self.path == "/playground/run":
+                # Run a chat against the configured model with the user prompt.
+                model = f.get("model") or "gemini-2.5-flash"
+                q = f.get("q", "")
+                try:
+                    out = ke_chat.chat("default", model, [{"role": "user", "content": q}], k=8)
+                    txt = out["choices"][0]["message"]["content"]
+                    cits = out.get("argus_citations", [])
+                except Exception as e:
+                    txt = f"error: {e}"
+                    cits = []
+                self._send(view_playground(prompt=q, model=model, answer=txt, citations=cits))
+                return
+
+            # ---------- Old autopilot form actions (preserved) ----------
             if self.path == "/connectors/add":
                 store.pg("INSERT INTO autopilot.connector (name,dbname,pg_user) VALUES "
                          f"({store.dq(f.get('name'))},{store.dq(f.get('dbname'))},"
                          f"{store.dq(f.get('pg_user','mehdi'))}) ON CONFLICT (dbname) DO NOTHING;")
-                self._redirect("/connectors")
+                self._redirect("/old/connectors")
             elif self.path == "/connectors/toggle":
                 store.pg(f"UPDATE autopilot.connector SET enabled = NOT enabled, updated_at=now() "
                          f"WHERE id={int(f['id'])};")
-                self._redirect("/connectors")
+                self._redirect("/old/connectors")
             elif self.path == "/connectors/delete":
                 store.pg(f"DELETE FROM autopilot.connector WHERE id={int(f['id'])};")
-                self._redirect("/connectors")
+                self._redirect("/old/connectors")
             elif self.path == "/connectors/test":
-                test_connector(f["id"]); self._redirect("/connectors")
+                test_connector(f["id"]); self._redirect("/old/connectors")
             elif self.path == "/schedule/set":
-                set_schedule(f["hour"]); self._redirect("/schedule")
+                set_schedule(f["hour"]); self._redirect("/old/schedule")
             elif self.path == "/run-now":
-                run_now(); self._redirect("/schedule")
+                run_now(); self._redirect("/old/schedule")
             else:
                 self._send("not found", 404, "text/plain")
         except Exception as e:
-            self._send(f"<pre>{esc(e)}</pre>", 500)
+            # /v1/* always gets JSON errors so clients don't choke on HTML
+            if self.path.startswith("/v1/"):
+                self._json({"error": {"message": str(e), "type": "server_error"}}, 500)
+            else:
+                self._send(f"<pre>{esc(e)}</pre>", 500)
 
     def log_message(self, *a):
         pass
