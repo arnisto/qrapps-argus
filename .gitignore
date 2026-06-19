@@ -39,3 +39,6 @@ docker/data/
 .cache/
 .eslintcache
 .parcel-cache/
+
+# Per-user Claude Code overrides (not committed)
+.claude/settings.local.json

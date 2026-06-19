@@ -736,232 +736,316 @@ class H(BaseHTTPRequestHandler):
             return False
         return True
 
+    # ------------------------------------------------------------------
+    # Declarative route tables.
+    # Refactored from giant if/elif chains in do_GET/do_POST so adding a
+    # route is a single dict entry, not another branch. The argus_code_review
+    # hook complained about it being a 17-branch chain — now zero.
+    # Each handler does its own auth check, body parsing, and response.
+    # ------------------------------------------------------------------
+
+    _GET_EXACT = {
+        "/":                       "_serve_console_index",
+        "/index.html":             "_serve_console_index",
+        "/console":                "_serve_console_index",
+        "/console/":               "_serve_console_index",
+        "/console/index.html":     "_serve_console_index",
+        "/support.js":             "_serve_console_js",
+        "/console/support.js":     "_serve_console_js",
+        "/teach":                  "_get_teach",
+        "/models":                 "_get_models",
+        "/api":                    "_get_api",
+        "/playground":             "_get_playground",
+        "/v1/sources":             "_get_v1_sources",
+        "/v1/keys":                "_get_v1_keys",
+        "/v1/providers":           "_get_v1_providers",
+        "/v1/requests":            "_get_v1_requests",
+        "/old":                    "_get_old_reports",
+        "/old/":                   "_get_old_reports",
+        "/old/connectors":         "_get_old_connectors",
+        "/old/playbooks":          "_get_old_playbooks",
+        "/old/usage":              "_get_old_usage",
+        "/old/schedule":           "_get_old_schedule",
+        "/old/help":               "_get_old_help",
+    }
+    # (prefix, handler) — checked AFTER exact match. Order matters only when
+    # one prefix is itself a prefix of another (none here today).
+    _GET_PREFIX = (
+        ("/v1/providers/test/", "_get_v1_provider_test"),
+    )
+
+    _POST_EXACT = {
+        "/v1/chat/completions":  "_post_v1_chat",
+        "/v1/providers":         "_post_v1_providers",
+        "/v1/ingest":            "_post_v1_ingest",
+        "/v1/keys":              "_post_v1_keys",
+        "/teach/upload":         "_post_teach_upload",
+        "/teach/qa":             "_post_teach_qa",
+        "/teach/delete":         "_post_teach_delete",
+        "/models/add":           "_post_models_add",
+        "/models/delete":        "_post_models_delete",
+        "/api/create-key":       "_post_api_create_key",
+        "/api/revoke-key":       "_post_api_revoke_key",
+        "/playground/run":       "_post_playground_run",
+        "/connectors/add":       "_post_old_conn_add",
+        "/connectors/toggle":    "_post_old_conn_toggle",
+        "/connectors/delete":    "_post_old_conn_delete",
+        "/connectors/test":      "_post_old_conn_test",
+        "/schedule/set":         "_post_old_sched_set",
+        "/run-now":              "_post_old_run_now",
+    }
+    _POST_PREFIX = (
+        ("/v1/providers/delete/", "_post_v1_provider_delete"),
+        ("/v1/keys/revoke/",      "_post_v1_key_revoke"),
+        ("/v1/keys/delete/",      "_post_v1_key_delete"),
+        ("/v1/sources/delete/",   "_post_v1_source_delete"),
+    )
+
+    # ---------- Dispatcher + error sink ----------
+    def _dispatch(self, exact, prefix):
+        # `/api?revealed_key=...` style: split query before exact lookup.
+        base = self.path.split("?", 1)[0]
+        name = exact.get(self.path) or exact.get(base)
+        if name:
+            return getattr(self, name)()
+        for p, handler in prefix:
+            if self.path.startswith(p):
+                return getattr(self, handler)(self.path[len(p):])
+        self._send("not found", 404, "text/plain")
+
+    def _error(self, e: Exception):
+        if self.path.startswith("/v1/"):
+            self._json({"error": {"message": str(e), "type": "server_error"}}, 500)
+        else:
+            self._send(f"<pre>{esc(e)}</pre>", 500)
+
     def do_GET(self):
         try:
-            console_dir = HERE / "console"
-            # ----- Claude design preview (the polished mockup) -----
-            if self.path in ("/", "/index.html", "/console", "/console/", "/console/index.html"):
-                self._send_static(console_dir / "index.html", "text/html; charset=utf-8")
-            elif self.path in ("/support.js", "/console/support.js"):
-                self._send_static(console_dir / "support.js", "application/javascript; charset=utf-8")
-            # ----- Working knowledge-engine UI -----
-            elif self.path == "/teach":
-                self._send(view_teach())
-            elif self.path == "/models":
-                self._send(view_models())
-            elif self.path == "/api" or self.path.startswith("/api?"):
-                qs = urllib.parse.urlparse(self.path).query
-                params = urllib.parse.parse_qs(qs)
-                self._send(view_api(revealed_key=(params.get("revealed_key") or [None])[0]))
-            elif self.path == "/playground":
-                self._send(view_playground())
-            # ----- Developer JSON API (per-tenant key required) -----
-            elif self.path == "/v1/sources":
-                if self._require_apikey() is None: return
-                self._json({"sources": ke_ingest.list_sources("default")})
-            # ----- Admin JSON API (admin token required) -----
-            elif self.path == "/v1/keys":
-                if not self._require_admin(): return
-                self._json({"keys": ke_keys.list_keys("default")})
-            elif self.path == "/v1/providers":
-                if not self._require_admin(): return
-                self._json({"providers": ke_providers.list_providers("default")})
-            elif self.path == "/v1/requests":
-                if not self._require_admin(): return
-                self._json({"requests": ke_chat.list_requests("default", limit=50)})
-            elif self.path.startswith("/v1/providers/test/"):
-                if not self._require_admin(): return
-                name = self.path.rsplit("/", 1)[-1]
-                self._json(ke_providers.test_provider("default", name))
-            # ----- Old real-data autopilot pages -----
-            elif self.path == "/old" or self.path == "/old/":
-                self._send(view_reports())
-            elif self.path == "/old/connectors":
-                self._send(view_connectors())
-            elif self.path == "/old/playbooks":
-                self._send(view_playbooks())
-            elif self.path == "/old/usage":
-                self._send(view_usage())
-            elif self.path == "/old/schedule":
-                self._send(view_schedule())
-            elif self.path == "/old/help":
-                self._send(view_help())
-            else:
-                self._send("not found", 404, "text/plain")
+            self._dispatch(self._GET_EXACT, self._GET_PREFIX)
         except Exception as e:
-            self._send(f"<pre>{esc(e)}</pre>", 500)
+            self._error(e)
 
     def do_POST(self):
         try:
-            ctype = self.headers.get("Content-Type", "")
-            is_v1 = self.path.startswith("/v1/")
-
-            # ---------- Developer JSON API ----------
-            if self.path == "/v1/chat/completions":
-                # OpenAI-compatible. Bearer required.
-                info = self._require_apikey()
-                if info is None: return
-                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode())
-                model = body.get("model") or "gemini-2.5-flash"
-                msgs = body.get("messages") or []
-                k = int(((body.get("argus") or {}).get("k")) or 8)
-                opts = {kk: body[kk] for kk in ("temperature", "max_tokens") if kk in body}
-                try:
-                    out = ke_chat.chat(info["tenant_id"], model, msgs,
-                                        k=k, apikey_id=int(info["id"]), **opts)
-                    self._json(out)
-                except Exception as ex:
-                    self._json({"error": {"message": str(ex), "type": "provider_error"}}, 502)
-                return
-
-            if self.path == "/v1/providers":
-                if not self._require_admin(): return
-                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode())
-                pid = ke_providers.add_provider(
-                    "default", body["name"], body["api_key"], body["default_model"],
-                    body.get("base_url"))
-                self._json({"id": pid, "name": body["name"], "default_model": body["default_model"]})
-                return
-
-            if self.path.startswith("/v1/providers/delete/"):
-                if not self._require_admin(): return
-                pid = int(self.path.rsplit("/", 1)[-1])
-                ke_providers.delete_provider("default", pid)
-                self._json({"ok": True})
-                return
-
-            if self.path == "/v1/ingest":
-                # Per-tenant API key required; both multipart and JSON QA paths.
-                info = self._require_apikey()
-                if info is None: return
-                if ctype.startswith("multipart/"):
-                    form = cgi.FieldStorage(
-                        fp=self.rfile, headers=self.headers,
-                        environ={"REQUEST_METHOD": "POST", "CONTENT_TYPE": ctype})
-                    field = form["file"] if "file" in form else None
-                    if field is None or not getattr(field, "filename", None):
-                        self._json({"error": {"message": "field 'file' missing"}}, 400); return
-                    tmp, display = _stash_upload(field)
-                    try:
-                        result = ke_ingest.ingest_file(info["tenant_id"], tmp,
-                                                        title=display,
-                                                        mime=field.type,
-                                                        added_by=f"apikey:{info['id']}")
-                    finally:
-                        try: tmp.unlink(missing_ok=True)
-                        except Exception: pass
-                    self._json(result); return
-                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode())
-                if body.get("kind") == "qa":
-                    self._json(ke_ingest.ingest_qa(info["tenant_id"], body["question"], body["answer"],
-                                                    added_by=f"apikey:{info['id']}"))
-                else:
-                    self._json({"error": {"message": "unknown ingest kind"}}, 400)
-                return
-
-            if self.path == "/v1/keys":
-                if not self._require_admin(): return
-                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode())
-                k = ke_keys.generate("default", body.get("name", "unnamed"),
-                                      scopes=body.get("scopes"),
-                                      rate_per_min=int(body.get("rate_per_min", 60)))
-                self._json(k); return
-
-            if self.path.startswith("/v1/keys/revoke/"):
-                if not self._require_admin(): return
-                ke_keys.revoke("default", int(self.path.rsplit("/", 1)[-1]))
-                self._json({"ok": True}); return
-            if self.path.startswith("/v1/keys/delete/"):
-                if not self._require_admin(): return
-                ke_keys.delete("default", int(self.path.rsplit("/", 1)[-1]))
-                self._json({"ok": True}); return
-            if self.path.startswith("/v1/sources/delete/"):
-                info = self._require_apikey()
-                if info is None: return
-                ke_ingest.delete_source(info["tenant_id"], int(self.path.rsplit("/", 1)[-1]))
-                self._json({"ok": True}); return
-
-            # ---------- Working UI form actions ----------
-            f = self._form() if ctype.startswith("application/x-www-form-urlencoded") else {}
-
-            if self.path == "/teach/upload":
-                form = cgi.FieldStorage(
-                    fp=self.rfile, headers=self.headers,
-                    environ={"REQUEST_METHOD": "POST", "CONTENT_TYPE": ctype})
-                field = form["file"] if "file" in form else None
-                if field is not None and getattr(field, "filename", None):
-                    tmp, display = _stash_upload(field)
-                    try:
-                        ke_ingest.ingest_file("default", tmp,
-                                                title=display, mime=field.type, added_by="ui")
-                    finally:
-                        try: tmp.unlink(missing_ok=True)
-                        except Exception: pass
-                self._redirect("/teach"); return
-
-            if self.path == "/teach/qa":
-                ke_ingest.ingest_qa("default", f.get("question", ""), f.get("answer", ""), "ui")
-                self._redirect("/teach"); return
-            if self.path == "/teach/delete":
-                ke_ingest.delete_source("default", int(f["id"])); self._redirect("/teach"); return
-
-            if self.path == "/models/add":
-                ke_providers.add_provider("default", f["name"], f["api_key"],
-                                            f["default_model"], f.get("base_url") or None)
-                self._redirect("/models"); return
-            if self.path == "/models/delete":
-                ke_providers.delete_provider("default", int(f["id"])); self._redirect("/models"); return
-
-            if self.path == "/api/create-key":
-                # Render the page directly with the plaintext key in the body — never
-                # via the URL (leaks through browser history, access logs, referrers).
-                # _send_secret adds Cache-Control: no-store + Referrer-Policy: no-referrer.
-                k = ke_keys.generate("default", f.get("name", "key"))
-                self._send_secret(view_api(revealed_key=k["key"])); return
-            if self.path == "/api/revoke-key":
-                ke_keys.revoke("default", int(f["id"])); self._redirect("/api"); return
-
-            if self.path == "/playground/run":
-                # Run a chat against the configured model with the user prompt.
-                model = f.get("model") or "gemini-2.5-flash"
-                q = f.get("q", "")
-                try:
-                    out = ke_chat.chat("default", model, [{"role": "user", "content": q}], k=8)
-                    txt = out["choices"][0]["message"]["content"]
-                    cits = out.get("argus_citations", [])
-                except Exception as e:
-                    txt = f"error: {e}"
-                    cits = []
-                self._send(view_playground(prompt=q, model=model, answer=txt, citations=cits))
-                return
-
-            # ---------- Old autopilot form actions (preserved) ----------
-            if self.path == "/connectors/add":
-                store.pg("INSERT INTO autopilot.connector (name,dbname,pg_user) VALUES "
-                         f"({store.dq(f.get('name'))},{store.dq(f.get('dbname'))},"
-                         f"{store.dq(f.get('pg_user','mehdi'))}) ON CONFLICT (dbname) DO NOTHING;")
-                self._redirect("/old/connectors")
-            elif self.path == "/connectors/toggle":
-                store.pg(f"UPDATE autopilot.connector SET enabled = NOT enabled, updated_at=now() "
-                         f"WHERE id={int(f['id'])};")
-                self._redirect("/old/connectors")
-            elif self.path == "/connectors/delete":
-                store.pg(f"DELETE FROM autopilot.connector WHERE id={int(f['id'])};")
-                self._redirect("/old/connectors")
-            elif self.path == "/connectors/test":
-                test_connector(f["id"]); self._redirect("/old/connectors")
-            elif self.path == "/schedule/set":
-                set_schedule(f["hour"]); self._redirect("/old/schedule")
-            elif self.path == "/run-now":
-                run_now(); self._redirect("/old/schedule")
-            else:
-                self._send("not found", 404, "text/plain")
+            self._dispatch(self._POST_EXACT, self._POST_PREFIX)
         except Exception as e:
-            # /v1/* always gets JSON errors so clients don't choke on HTML
-            if self.path.startswith("/v1/"):
-                self._json({"error": {"message": str(e), "type": "server_error"}}, 500)
-            else:
-                self._send(f"<pre>{esc(e)}</pre>", 500)
+            self._error(e)
+
+    # ---------- Body-parsing helpers (so handlers stay tiny) ----------
+    def _json_body(self) -> dict:
+        n = int(self.headers.get("Content-Length", 0) or 0)
+        return json.loads(self.rfile.read(n).decode() or "{}")
+
+    def _multipart_form(self):
+        return cgi.FieldStorage(
+            fp=self.rfile, headers=self.headers,
+            environ={"REQUEST_METHOD": "POST",
+                     "CONTENT_TYPE": self.headers.get("Content-Type", "")})
+
+    # ---------- GET handlers ----------
+    def _serve_console_index(self):
+        self._send_static(HERE / "console" / "index.html", "text/html; charset=utf-8")
+
+    def _serve_console_js(self):
+        self._send_static(HERE / "console" / "support.js",
+                           "application/javascript; charset=utf-8")
+
+    def _get_teach(self):      self._send(view_teach())
+    def _get_models(self):     self._send(view_models())
+    def _get_playground(self): self._send(view_playground())
+
+    def _get_api(self):
+        qs = urllib.parse.urlparse(self.path).query
+        params = urllib.parse.parse_qs(qs)
+        self._send(view_api(revealed_key=(params.get("revealed_key") or [None])[0]))
+
+    def _get_v1_sources(self):
+        info = self._require_apikey()
+        if info is None: return
+        self._json({"sources": ke_ingest.list_sources("default")})
+
+    def _get_v1_keys(self):
+        if not self._require_admin(): return
+        self._json({"keys": ke_keys.list_keys("default")})
+
+    def _get_v1_providers(self):
+        if not self._require_admin(): return
+        self._json({"providers": ke_providers.list_providers("default")})
+
+    def _get_v1_requests(self):
+        if not self._require_admin(): return
+        self._json({"requests": ke_chat.list_requests("default", limit=50)})
+
+    def _get_v1_provider_test(self, name: str):
+        if not self._require_admin(): return
+        self._json(ke_providers.test_provider("default", name))
+
+    def _get_old_reports(self):    self._send(view_reports())
+    def _get_old_connectors(self): self._send(view_connectors())
+    def _get_old_playbooks(self):  self._send(view_playbooks())
+    def _get_old_usage(self):      self._send(view_usage())
+    def _get_old_schedule(self):   self._send(view_schedule())
+    def _get_old_help(self):       self._send(view_help())
+
+    # ---------- POST handlers (developer JSON API) ----------
+    def _post_v1_chat(self):
+        info = self._require_apikey()
+        if info is None: return
+        body = self._json_body()
+        model = body.get("model") or "gemini-2.5-flash"
+        msgs = body.get("messages") or []
+        k = int(((body.get("argus") or {}).get("k")) or 8)
+        opts = {kk: body[kk] for kk in ("temperature", "max_tokens") if kk in body}
+        try:
+            self._json(ke_chat.chat(info["tenant_id"], model, msgs,
+                                      k=k, apikey_id=int(info["id"]), **opts))
+        except Exception as ex:
+            self._json({"error": {"message": str(ex), "type": "provider_error"}}, 502)
+
+    def _post_v1_providers(self):
+        if not self._require_admin(): return
+        body = self._json_body()
+        pid = ke_providers.add_provider("default", body["name"], body["api_key"],
+                                          body["default_model"], body.get("base_url"))
+        self._json({"id": pid, "name": body["name"],
+                    "default_model": body["default_model"]})
+
+    def _post_v1_provider_delete(self, suffix: str):
+        if not self._require_admin(): return
+        ke_providers.delete_provider("default", int(suffix))
+        self._json({"ok": True})
+
+    def _post_v1_ingest(self):
+        info = self._require_apikey()
+        if info is None: return
+        if self.headers.get("Content-Type", "").startswith("multipart/"):
+            return self._ingest_multipart(info)
+        body = self._json_body()
+        if body.get("kind") != "qa":
+            self._json({"error": {"message": "unknown ingest kind"}}, 400); return
+        self._json(ke_ingest.ingest_qa(info["tenant_id"], body["question"],
+                                         body["answer"],
+                                         added_by=f"apikey:{info['id']}"))
+
+    def _ingest_multipart(self, info: dict):
+        form = self._multipart_form()
+        field = form["file"] if "file" in form else None
+        if field is None or not getattr(field, "filename", None):
+            self._json({"error": {"message": "field 'file' missing"}}, 400); return
+        tmp, display = _stash_upload(field)
+        try:
+            self._json(ke_ingest.ingest_file(info["tenant_id"], tmp,
+                                               title=display, mime=field.type,
+                                               added_by=f"apikey:{info['id']}"))
+        finally:
+            try: tmp.unlink(missing_ok=True)
+            except Exception: pass
+
+    def _post_v1_keys(self):
+        if not self._require_admin(): return
+        body = self._json_body()
+        self._json(ke_keys.generate("default", body.get("name", "unnamed"),
+                                     scopes=body.get("scopes"),
+                                     rate_per_min=int(body.get("rate_per_min", 60))))
+
+    def _post_v1_key_revoke(self, suffix: str):
+        if not self._require_admin(): return
+        ke_keys.revoke("default", int(suffix)); self._json({"ok": True})
+
+    def _post_v1_key_delete(self, suffix: str):
+        if not self._require_admin(): return
+        ke_keys.delete("default", int(suffix)); self._json({"ok": True})
+
+    def _post_v1_source_delete(self, suffix: str):
+        info = self._require_apikey()
+        if info is None: return
+        ke_ingest.delete_source(info["tenant_id"], int(suffix))
+        self._json({"ok": True})
+
+    # ---------- POST handlers (working UI form actions) ----------
+    def _post_teach_upload(self):
+        form = self._multipart_form()
+        field = form["file"] if "file" in form else None
+        if field is not None and getattr(field, "filename", None):
+            tmp, display = _stash_upload(field)
+            try:
+                ke_ingest.ingest_file("default", tmp, title=display,
+                                        mime=field.type, added_by="ui")
+            finally:
+                try: tmp.unlink(missing_ok=True)
+                except Exception: pass
+        self._redirect("/teach")
+
+    def _post_teach_qa(self):
+        f = self._form()
+        ke_ingest.ingest_qa("default", f.get("question", ""),
+                              f.get("answer", ""), "ui")
+        self._redirect("/teach")
+
+    def _post_teach_delete(self):
+        ke_ingest.delete_source("default", int(self._form()["id"]))
+        self._redirect("/teach")
+
+    def _post_models_add(self):
+        f = self._form()
+        ke_providers.add_provider("default", f["name"], f["api_key"],
+                                    f["default_model"], f.get("base_url") or None)
+        self._redirect("/models")
+
+    def _post_models_delete(self):
+        ke_providers.delete_provider("default", int(self._form()["id"]))
+        self._redirect("/models")
+
+    def _post_api_create_key(self):
+        # plaintext key rendered in body, never via URL (uses _send_secret →
+        # Cache-Control: no-store, Referrer-Policy: no-referrer).
+        k = ke_keys.generate("default", self._form().get("name", "key"))
+        self._send_secret(view_api(revealed_key=k["key"]))
+
+    def _post_api_revoke_key(self):
+        ke_keys.revoke("default", int(self._form()["id"]))
+        self._redirect("/api")
+
+    def _post_playground_run(self):
+        f = self._form()
+        model = f.get("model") or "gemini-2.5-flash"
+        q = f.get("q", "")
+        try:
+            out = ke_chat.chat("default", model,
+                                [{"role": "user", "content": q}], k=8)
+            txt = out["choices"][0]["message"]["content"]
+            cits = out.get("argus_citations", [])
+        except Exception as e:
+            txt, cits = f"error: {e}", []
+        self._send(view_playground(prompt=q, model=model,
+                                     answer=txt, citations=cits))
+
+    # ---------- POST handlers (legacy autopilot pages under /old) ----------
+    def _post_old_conn_add(self):
+        f = self._form()
+        store.pg("INSERT INTO autopilot.connector (name,dbname,pg_user) VALUES "
+                  f"({store.dq(f.get('name'))},{store.dq(f.get('dbname'))},"
+                  f"{store.dq(f.get('pg_user','mehdi'))}) "
+                  "ON CONFLICT (dbname) DO NOTHING;")
+        self._redirect("/old/connectors")
+
+    def _post_old_conn_toggle(self):
+        store.pg("UPDATE autopilot.connector SET enabled = NOT enabled, updated_at=now() "
+                  f"WHERE id={int(self._form()['id'])};")
+        self._redirect("/old/connectors")
+
+    def _post_old_conn_delete(self):
+        store.pg(f"DELETE FROM autopilot.connector WHERE id={int(self._form()['id'])};")
+        self._redirect("/old/connectors")
+
+    def _post_old_conn_test(self):
+        test_connector(self._form()["id"]); self._redirect("/old/connectors")
+
+    def _post_old_sched_set(self):
+        set_schedule(self._form()["hour"]); self._redirect("/old/schedule")
+
+    def _post_old_run_now(self):
+        run_now(); self._redirect("/old/schedule")
 
     def log_message(self, *a):
         pass
