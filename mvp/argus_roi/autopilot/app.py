@@ -416,19 +416,36 @@ class H(BaseHTTPRequestHandler):
         raw = self.rfile.read(n).decode()
         return {k: v[0] for k, v in urllib.parse.parse_qs(raw).items()}
 
+    def _send_static(self, fp: Path, ctype: str):
+        data = fp.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_GET(self):
         try:
-            if self.path in ("/", "/index.html"):
+            # NEW UI: the imported Claude Console design served as static files.
+            # `/` IS the new console; the prior real-data pages move under /old/*.
+            console_dir = HERE / "console"
+            if self.path in ("/", "/index.html", "/console", "/console/", "/console/index.html"):
+                self._send_static(console_dir / "index.html", "text/html; charset=utf-8")
+            elif self.path in ("/support.js", "/console/support.js"):
+                self._send_static(console_dir / "support.js", "application/javascript; charset=utf-8")
+            # Old real-data pages remain accessible at /old/...
+            elif self.path == "/old" or self.path == "/old/":
                 self._send(view_reports())
-            elif self.path == "/connectors":
+            elif self.path == "/old/connectors":
                 self._send(view_connectors())
-            elif self.path == "/playbooks":
+            elif self.path == "/old/playbooks":
                 self._send(view_playbooks())
-            elif self.path == "/usage":
+            elif self.path == "/old/usage":
                 self._send(view_usage())
-            elif self.path == "/schedule":
+            elif self.path == "/old/schedule":
                 self._send(view_schedule())
-            elif self.path == "/help":
+            elif self.path == "/old/help":
                 self._send(view_help())
             else:
                 self._send("not found", 404, "text/plain")

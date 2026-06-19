@@ -14,13 +14,17 @@ JSON values are passed via dollar-quoting to sidestep escaping.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-ARGUS_PG_URL = "postgresql://argus:argus@localhost:5434/argus"
-REDIS_CONTAINER = "argus-redis"
+ARGUS_PG_URL = os.environ.get(
+    "ARGUS_ENGINE_DB_URL",
+    "postgresql://argus:argus@localhost:5435/argus",
+)
+REDIS_CONTAINER = os.environ.get("ARGUS_REDIS_CONTAINER", "argus-redis")
 
 
 # ---- Postgres -------------------------------------------------------------

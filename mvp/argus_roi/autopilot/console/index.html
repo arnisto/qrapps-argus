@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{font-family:'IBM Plex Sans','IBM Plex Sans Arabic',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  ::selection{background:rgba(42,111,219,.18);}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-thumb{background:rgba(128,128,128,.28);border-radius:8px;border:2px solid transparent;background-clip:padding-box;}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(128,128,128,.45);background-clip:padding-box;}
+  textarea{font-family:inherit;}
+  @keyframes argusToast{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes argusFade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</helmet>
+
+<div style="{{ rootStyle }}">
+
+  <!-- TOP BAR -->
+  <header style="display:flex;align-items:center;gap:18px;height:56px;flex:none;padding:0 18px;border-bottom:1px solid var(--border,#e6e2d9);background:var(--surface,#fff);">
+    <div style="display:flex;align-items:center;gap:9px;">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8.2" stroke="var(--accent,#2A6FDB)" stroke-width="1.6"/><circle cx="11" cy="11" r="3" fill="var(--accent,#2A6FDB)"/></svg>
+      <span style="font-size:16px;font-weight:600;letter-spacing:-.01em;color:var(--text,#1b1a17);">Argus</span>
+    </div>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:500;letter-spacing:.02em;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);border:1px solid var(--border,#e6e2d9);padding:3px 8px;border-radius:5px;">self-hosted · single-tenant</span>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:500;color:var(--accent,#2A6FDB);background:var(--accent-soft,#eaf1fc);padding:3px 8px;border-radius:5px;display:flex;align-items:center;gap:6px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--green,#1f8a5b);display:inline-block;"></span>LiteLLM → qwen2.5 · gpt-4o-mini</span>
+    <div style="flex:1;"></div>
+    <span style="font-size:11.5px;color:var(--text-3,#928e84);font-family:'IBM Plex Mono',monospace;">EN · العربية (RTL)</span>
+    <div style="display:flex;background:var(--inset,#f0ede7);border:1px solid var(--border,#e6e2d9);border-radius:7px;padding:2px;gap:2px;">
+      <button onClick="{{ setLight }}" style="{{ lightBtn }}">Light</button>
+      <button onClick="{{ setDark }}" style="{{ darkBtn }}">Dark</button>
+    </div>
+    <div style="width:30px;height:30px;border-radius:50%;background:var(--accent,#2A6FDB);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600;">LG</div>
+  </header>
+
+  <div style="display:flex;flex:1;min-height:0;">
+
+    <!-- SIDEBAR -->
+    <nav style="width:228px;flex:none;border-right:1px solid var(--border,#e6e2d9);background:var(--surface,#fff);display:flex;flex-direction:column;padding:14px 12px;">
+      <div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--text-3,#928e84);text-transform:uppercase;padding:4px 10px 8px;">Workspace</div>
+      <button onClick="{{ navInbox }}" style="{{ ns.inbox }}">
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M2.5 12h3.6l1.2 2.2h5.4L13.9 12h3.6"/></svg>
+        <span style="flex:1;text-align:left;">Inbox</span>
+        <span style="{{ badgeNeeds }}">{{ needsCount }}</span>
+      </button>
+      <button onClick="{{ navKnow }}" style="{{ ns.know }}">
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4.5h6.5a2 2 0 0 1 2 2V16H6a2 2 0 0 1-2-2z"/><path d="M16 4.5h-3.5"/></svg>
+        <span style="flex:1;text-align:left;">Knowledge core</span>
+      </button>
+      <button onClick="{{ navGaps }}" style="{{ ns.gaps }}">
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3.5" width="14" height="10" rx="2.5"/><path d="M7 13.5l-2 3v-3"/><path d="M8.4 7.2a1.6 1.6 0 1 1 2.2 1.5c-.5.2-.6.5-.6 1"/><circle cx="10" cy="11.1" r=".5" fill="currentColor" stroke="none"/></svg>
+        <span style="flex:1;text-align:left;">Interview</span>
+        <span style="{{ badgeGaps }}">{{ gapsOpen }}</span>
+      </button>
+      <button onClick="{{ navAudit }}" style="{{ ns.audit }}">
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 5h10M5 10h10M5 15h6"/></svg>
+        <span style="flex:1;text-align:left;">Audit log</span>
+      </button>
+      <button onClick="{{ navSettings }}" style="{{ ns.settings }}">
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6.5h14M3 13.5h14"/><circle cx="8" cy="6.5" r="2.1" fill="var(--surface,#fff)"/><circle cx="13" cy="13.5" r="2.1" fill="var(--surface,#fff)"/></svg>
+        <span style="flex:1;text-align:left;">Settings</span>
+      </button>
+
+      <div style="flex:1;"></div>
+      <div style="border:1px solid var(--border,#e6e2d9);background:var(--inset,#f0ede7);border-radius:9px;padding:11px 12px;">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px;">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="var(--green,#1f8a5b)" stroke-width="1.6"><rect x="3" y="6.2" width="8" height="5.5" rx="1.3"/><path d="M4.6 6.2V4.7a2.4 2.4 0 0 1 4.8 0v1.5"/></svg>
+          <span style="font-size:10.5px;font-weight:600;letter-spacing:.04em;color:var(--green,#1f8a5b);text-transform:uppercase;">Guardrails active</span>
+        </div>
+        <div style="font-size:11.5px;line-height:1.5;color:var(--text-2,#5f5c54);">Nothing sends without your approval. Drafts are grounded-only. DB access is read-only.</div>
+      </div>
+    </nav>
+
+    <!-- MAIN -->
+    <main style="flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg,#f4f2ee);">
+
+      <!-- ============ INBOX ============ -->
+      <sc-if value="{{ isInbox }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:1;display:flex;min-height:0;">
+
+        <!-- message list -->
+        <section style="width:340px;flex:none;border-right:1px solid var(--border,#e6e2d9);display:flex;flex-direction:column;background:var(--surface,#fff);">
+          <div style="flex:none;padding:15px 16px 11px;border-bottom:1px solid var(--border,#e6e2d9);">
+            <div style="font-size:14px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:11px;">Inbound</div>
+            <div style="display:flex;gap:4px;background:var(--inset,#f0ede7);border-radius:8px;padding:3px;">
+              <button onClick="{{ tabNeeds }}" style="{{ tabNeedsStyle }}">Needs review <span style="opacity:.7;">· {{ needsCount }}</span></button>
+              <button onClick="{{ tabSent }}" style="{{ tabSentStyle }}">Resolved</button>
+            </div>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding:8px;">
+            <sc-for list="{{ list }}" as="it" hint-placeholder-count="4">
+              <button onClick="{{ it.onSelect }}" style="{{ it.style }}">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+                  <span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ it.dot }};"></span>
+                  <span style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);flex:1;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ it.sender }}</span>
+                  <span style="font-size:10.5px;color:var(--text-3,#928e84);font-family:'IBM Plex Mono',monospace;flex:none;">{{ it.time }}</span>
+                </div>
+                <div dir="{{ it.dir }}" style="font-size:12px;line-height:1.45;color:var(--text-2,#5f5c54);text-align:start;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:8px;">{{ it.snippet }}</div>
+                <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+                  <span style="font-size:10px;font-weight:500;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);padding:2px 6px;border-radius:4px;">{{ it.channel }}</span>
+                  <span style="font-size:10px;font-weight:500;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);padding:2px 6px;border-radius:4px;">{{ it.langLabel }}</span>
+                  <span style="{{ it.urgStyle }}">{{ it.urgency }}</span>
+                  <div style="flex:1;"></div>
+                  <span style="{{ it.statusStyle }}">{{ it.statusLabel }}</span>
+                </div>
+              </button>
+            </sc-for>
+            <sc-if value="{{ listEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="text-align:center;padding:48px 20px;color:var(--text-3,#928e84);font-size:13px;">Nothing here yet.</div>
+            </sc-if>
+          </div>
+        </section>
+
+        <!-- detail -->
+        <section style="flex:1;min-width:0;overflow-y:auto;">
+          <div style="max-width:720px;margin:0 auto;padding:26px 30px 60px;">
+
+            <!-- header -->
+            <div style="display:flex;align-items:flex-start;gap:13px;margin-bottom:20px;">
+              <div style="width:40px;height:40px;border-radius:9px;flex:none;background:var(--accent-soft,#eaf1fc);color:var(--accent,#2A6FDB);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;">{{ sel.initials }}</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:16px;font-weight:600;color:var(--text,#1b1a17);">{{ sel.sender }}</div>
+                <div style="font-size:12px;color:var(--text-3,#928e84);font-family:'IBM Plex Mono',monospace;margin-top:1px;">{{ sel.channel }} · {{ sel.time }}</div>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+                <span style="font-size:11px;font-weight:500;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);border:1px solid var(--border,#e6e2d9);padding:3px 9px;border-radius:6px;">{{ sel.intent }}</span>
+                <span style="{{ sel.urgChip }}">{{ sel.urgency }}</span>
+                <span style="font-size:11px;font-weight:500;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);border:1px solid var(--border,#e6e2d9);padding:3px 9px;border-radius:6px;">{{ sel.langLabel }}</span>
+              </div>
+            </div>
+
+            <!-- inbound message -->
+            <div style="margin-bottom:24px;">
+              <div style="font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3,#928e84);margin-bottom:8px;">Inbound message</div>
+              <div dir="{{ sel.dir }}" style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:4px 14px 14px 14px;padding:15px 17px;font-size:14.5px;line-height:1.6;color:var(--text,#1b1a17);text-align:start;box-shadow:var(--shadow);">{{ sel.text }}</div>
+            </div>
+
+            <!-- draft block -->
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:11px;">
+              <svg width="15" height="15" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8.2" stroke="var(--accent,#2A6FDB)" stroke-width="1.6"/><circle cx="11" cy="11" r="3" fill="var(--accent,#2A6FDB)"/></svg>
+              <span style="font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text,#1b1a17);">Argus draft</span>
+              <span style="font-size:11px;color:var(--text-3,#928e84);font-family:'IBM Plex Mono',monospace;">· {{ sel.model }}</span>
+            </div>
+
+            <!-- confidence -->
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:13px;">
+              <div style="flex:1;height:6px;border-radius:4px;background:var(--inset,#f0ede7);overflow:hidden;">
+                <div style="height:100%;width:{{ sel.confPct }};background:{{ sel.confColor }};border-radius:4px;transition:width .4s ease;"></div>
+              </div>
+              <span style="font-size:11.5px;font-weight:600;color:{{ sel.confColor }};font-family:'IBM Plex Mono',monospace;white-space:nowrap;">{{ sel.confLabel }} · {{ sel.confPct }}</span>
+            </div>
+
+            <!-- gap callout (low confidence) -->
+            <sc-if value="{{ sel.isGap }}" hint-placeholder-val="{{ false }}">
+              <div style="background:var(--red-soft,#f7e7e3);border:1px solid var(--red,#bb3a2c);border-radius:11px;padding:14px 16px;margin-bottom:16px;">
+                <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px;">
+                  <span style="width:7px;height:7px;border-radius:50%;background:var(--red,#bb3a2c);"></span>
+                  <span style="font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--red,#bb3a2c);">Knowledge gap detected</span>
+                </div>
+                <div style="font-size:13.5px;line-height:1.55;color:var(--text,#1b1a17);margin-bottom:11px;">Argus has no grounded fact for <strong>“{{ sel.gapSlot }}”</strong>. It will hold and ask the team rather than invent an answer.</div>
+                <button onClick="{{ askTeam }}" style="{{ askBtn }}">{{ askLabel }}</button>
+              </div>
+            </sc-if>
+
+            <!-- draft / editor -->
+            <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
+              <textarea dir="{{ sel.dir }}" value="{{ editText }}" onInput="{{ onEdit }}" style="width:100%;min-height:120px;resize:vertical;background:var(--surface,#fff);border:1.5px solid var(--accent,#2A6FDB);border-radius:12px;padding:15px 17px;font-size:14.5px;line-height:1.6;color:var(--text,#1b1a17);text-align:start;outline:none;box-shadow:0 0 0 4px var(--accent-soft,#eaf1fc);"></textarea>
+            </sc-if>
+            <sc-if value="{{ showDraft }}" hint-placeholder-val="{{ true }}">
+              <div dir="{{ sel.dir }}" style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:12px;padding:15px 17px;font-size:14.5px;line-height:1.65;color:var(--text,#1b1a17);text-align:start;white-space:pre-wrap;box-shadow:var(--shadow);">{{ sel.draftShown }}</div>
+            </sc-if>
+
+            <!-- sources -->
+            <sc-if value="{{ hasSources }}" hint-placeholder-val="{{ true }}">
+              <div style="margin-top:18px;">
+                <div style="font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3,#928e84);margin-bottom:9px;">Grounded on {{ sourceCount }} sources</div>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                  <sc-for list="{{ selSources }}" as="src" hint-placeholder-count="2">
+                    <div onMouseEnter="{{ src.onEnter }}" onMouseLeave="{{ src.onLeave }}" style="{{ src.style }}">
+                      <div style="width:22px;height:22px;border-radius:6px;flex:none;background:{{ src.tagBg }};color:{{ src.tagColor }};display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;font-family:'IBM Plex Mono',monospace;">{{ src.marker }}</div>
+                      <div style="flex:1;min-width:0;">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap;">
+                          <span style="{{ src.typeChip }}">{{ src.typeLabel }}</span>
+                          <span style="font-size:12.5px;font-weight:600;color:var(--text,#1b1a17);">{{ src.label }}</span>
+                          <span style="font-size:10.5px;color:var(--text-3,#928e84);font-family:'IBM Plex Mono',monospace;">{{ src.ref }}</span>
+                        </div>
+                        <div style="font-size:12.5px;line-height:1.5;color:var(--text-2,#5f5c54);">{{ src.content }}</div>
+                      </div>
+                      <div style="flex:none;text-align:right;">
+                        <div style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);">{{ src.time }}</div>
+                        <div style="font-size:11px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--green,#1f8a5b);margin-top:2px;">{{ src.conf }}</div>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- actions -->
+            <sc-if value="{{ showActions }}" hint-placeholder-val="{{ true }}">
+              <div style="margin-top:24px;border-top:1px solid var(--border,#e6e2d9);padding-top:18px;">
+                <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;gap:10px;">
+                    <button onClick="{{ approve }}" style="{{ primaryBtn }}">Save &amp; send</button>
+                    <button onClick="{{ cancelEdit }}" style="{{ ghostBtn }}">Cancel</button>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ showMainActions }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;gap:10px;align-items:center;">
+                    <button onClick="{{ approve }}" style="{{ approveBtn }}">
+                      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3.5 8.5l3 3 6-7"/></svg>
+                      {{ approveLabel }}
+                    </button>
+                    <button onClick="{{ startEdit }}" style="{{ ghostBtn }}">Edit</button>
+                    <button onClick="{{ reject }}" style="{{ rejectBtn }}">{{ rejectLabel }}</button>
+                    <div style="flex:1;"></div>
+                    <span style="font-size:10.5px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3,#928e84);font-family:'IBM Plex Mono',monospace;display:flex;align-items:center;gap:6px;">
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6.2" width="8" height="5.5" rx="1.3"/><path d="M4.6 6.2V4.7a2.4 2.4 0 0 1 4.8 0v1.5"/></svg>
+                      Approval required
+                    </span>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <!-- decided banner -->
+            <sc-if value="{{ isDecided }}" hint-placeholder-val="{{ false }}">
+              <div style="{{ decidedStyle }}">
+                <div style="display:flex;align-items:center;gap:9px;">
+                  <span style="font-size:13.5px;font-weight:600;">{{ decidedTitle }}</span>
+                  <span style="font-size:11.5px;font-family:'IBM Plex Mono',monospace;opacity:.85;">{{ decidedMeta }}</span>
+                </div>
+              </div>
+            </sc-if>
+
+          </div>
+        </section>
+      </div>
+      </sc-if>
+
+      <!-- ============ KNOWLEDGE ============ -->
+      <sc-if value="{{ isKnow }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;overflow-y:auto;padding:30px 36px 60px;">
+        <div style="max-width:860px;margin:0 auto;">
+          <h1 style="font-size:21px;font-weight:600;color:var(--text,#1b1a17);margin:0 0 4px;letter-spacing:-.01em;">Knowledge core</h1>
+          <p style="font-size:13.5px;color:var(--text-2,#5f5c54);margin:0 0 24px;">Every fact carries its source, timestamp and confidence — so files, database and answered questions reconcile, and stale facts decay.</p>
+
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px;">
+            <sc-for list="{{ connectors }}" as="c" hint-placeholder-count="3">
+              <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:16px;box-shadow:var(--shadow);">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;">
+                  <span style="{{ c.typeChip }}">{{ c.typeLabel }}</span>
+                  <span style="font-size:10.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--green,#1f8a5b);display:flex;align-items:center;gap:5px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--green,#1f8a5b);"></span>{{ c.status }}</span>
+                </div>
+                <div style="font-size:15px;font-weight:600;color:var(--text,#1b1a17);">{{ c.stat }}</div>
+                <div style="font-size:12px;color:var(--text-2,#5f5c54);margin-top:3px;line-height:1.45;">{{ c.sub }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;">
+            <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:18px;box-shadow:var(--shadow);">
+              <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:14px;">Recent facts</div>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <sc-for list="{{ recentFacts }}" as="f" hint-placeholder-count="4">
+                  <div style="display:flex;gap:11px;align-items:flex-start;">
+                    <span style="{{ f.typeChip }}">{{ f.typeLabel }}</span>
+                    <div style="flex:1;min-width:0;">
+                      <div style="font-size:13px;line-height:1.5;color:var(--text,#1b1a17);">{{ f.content }}</div>
+                      <div style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);margin-top:3px;">{{ f.src }} · {{ f.time }} · conf {{ f.conf }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:18px;box-shadow:var(--shadow);">
+              <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:4px;">Freshness</div>
+              <div style="font-size:11.5px;color:var(--text-2,#5f5c54);margin-bottom:16px;line-height:1.45;">Facts decay toward their <span style="font-family:'IBM Plex Mono',monospace;">valid_until</span>.</div>
+              <sc-for list="{{ freshness }}" as="fr" hint-placeholder-count="3">
+                <div style="margin-bottom:14px;">
+                  <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-2,#5f5c54);margin-bottom:5px;"><span>{{ fr.label }}</span><span style="font-family:'IBM Plex Mono',monospace;color:var(--text,#1b1a17);">{{ fr.count }}</span></div>
+                  <div style="height:6px;border-radius:4px;background:var(--inset,#f0ede7);overflow:hidden;"><div style="height:100%;width:{{ fr.pct }};background:{{ fr.color }};border-radius:4px;"></div></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ INTERVIEW / GAPS ============ -->
+      <sc-if value="{{ isGaps }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;overflow-y:auto;padding:30px 36px 60px;">
+        <div style="max-width:800px;margin:0 auto;">
+          <h1 style="font-size:21px;font-weight:600;color:var(--text,#1b1a17);margin:0 0 4px;letter-spacing:-.01em;">Interview loop</h1>
+          <p style="font-size:13.5px;color:var(--text-2,#5f5c54);margin:0 0 24px;">Argus doesn't only answer from what it's given — it detects what it <em>doesn't</em> know about your business and asks the team to fill the gap.</p>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <sc-for list="{{ gaps }}" as="g" hint-placeholder-count="4">
+              <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:16px 18px;box-shadow:var(--shadow);">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;">
+                  <span style="{{ g.statusChip }}">{{ g.statusLabel }}</span>
+                  <span style="font-size:14px;font-weight:600;color:var(--text,#1b1a17);flex:1;">{{ g.slot }}</span>
+                  <button onClick="{{ g.onAct }}" style="{{ g.btnStyle }}">{{ g.btnLabel }}</button>
+                </div>
+                <div style="font-size:13px;line-height:1.55;color:var(--text-2,#5f5c54);">{{ g.body }}</div>
+                <div style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);margin-top:8px;">{{ g.meta }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ AUDIT ============ -->
+      <sc-if value="{{ isAudit }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;overflow-y:auto;padding:30px 36px 60px;">
+        <div style="max-width:920px;margin:0 auto;">
+          <div style="display:flex;align-items:center;gap:11px;margin-bottom:4px;">
+            <h1 style="font-size:21px;font-weight:600;color:var(--text,#1b1a17);margin:0;letter-spacing:-.01em;">Audit log</h1>
+            <span style="font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--green,#1f8a5b);background:var(--green-soft,#e6f4ec);padding:3px 9px;border-radius:6px;font-family:'IBM Plex Mono',monospace;">append-only · immutable</span>
+          </div>
+          <p style="font-size:13.5px;color:var(--text-2,#5f5c54);margin:0 0 22px;">Every inbound message, model used and human decision is recorded. Nothing is editable.</p>
+          <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;overflow:hidden;box-shadow:var(--shadow);">
+            <div style="display:grid;grid-template-columns:96px 110px 110px 1fr 150px;gap:14px;padding:11px 18px;border-bottom:1px solid var(--border,#e6e2d9);background:var(--inset,#f0ede7);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3,#928e84);">
+              <span>When</span><span>Actor</span><span>Action</span><span>Detail</span><span>Model</span>
+            </div>
+            <sc-for list="{{ audit }}" as="a" hint-placeholder-count="6">
+              <div style="display:grid;grid-template-columns:96px 110px 110px 1fr 150px;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border,#e6e2d9);align-items:center;font-size:12.5px;">
+                <span style="font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);font-size:11.5px;">{{ a.time }}</span>
+                <span style="color:var(--text,#1b1a17);font-weight:500;">{{ a.actor }}</span>
+                <span style="{{ a.chip }}">{{ a.action }}</span>
+                <span style="color:var(--text-2,#5f5c54);line-height:1.45;">{{ a.detail }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);font-size:11px;">{{ a.model }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ SETTINGS ============ -->
+      <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;overflow-y:auto;padding:30px 36px 60px;">
+        <div style="max-width:760px;margin:0 auto;">
+          <h1 style="font-size:21px;font-weight:600;color:var(--text,#1b1a17);margin:0 0 4px;letter-spacing:-.01em;">Settings</h1>
+          <p style="font-size:13.5px;color:var(--text-2,#5f5c54);margin:0 0 24px;">Everything is user-supplied via config / env. No secrets, endpoints or company assumptions are hard-coded.</p>
+
+          <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:20px;margin-bottom:14px;box-shadow:var(--shadow);">
+            <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:15px;">LLM gateway</div>
+            <sc-for list="{{ llmFields }}" as="f" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-top:1px solid var(--border,#e6e2d9);">
+                <span style="font-size:12.5px;color:var(--text-2,#5f5c54);">{{ f.label }}</span>
+                <span style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--text,#1b1a17);background:var(--inset,#f0ede7);padding:3px 9px;border-radius:6px;">{{ f.value }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:20px;margin-bottom:14px;box-shadow:var(--shadow);">
+            <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:13px;">Channels</div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <sc-for list="{{ channels }}" as="ch" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <span style="width:8px;height:8px;border-radius:50%;background:var(--green,#1f8a5b);flex:none;"></span>
+                  <div style="flex:1;">
+                    <div style="font-size:13px;font-weight:500;color:var(--text,#1b1a17);">{{ ch.name }} <span style="font-size:10.5px;font-weight:500;color:var(--text-3,#928e84);">· {{ ch.kind }}</span></div>
+                    <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);margin-top:1px;">{{ ch.detail }}</div>
+                  </div>
+                  <span style="font-size:11px;font-weight:600;color:var(--green,#1f8a5b);">{{ ch.status }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:20px;box-shadow:var(--shadow);">
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:14px;">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--green,#1f8a5b)" stroke-width="1.6"><rect x="3" y="6.2" width="8" height="5.5" rx="1.3"/><path d="M4.6 6.2V4.7a2.4 2.4 0 0 1 4.8 0v1.5"/></svg>
+              <span style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);">Guardrails</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:11px;">
+              <sc-for list="{{ guardrails }}" as="gr" hint-placeholder-count="5">
+                <div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--border,#e6e2d9);">
+                  <div style="flex:1;">
+                    <div style="font-size:13px;font-weight:500;color:var(--text,#1b1a17);">{{ gr.label }}</div>
+                    <div style="font-size:11.5px;color:var(--text-3,#928e84);margin-top:1px;">{{ gr.note }}</div>
+                  </div>
+                  <span style="{{ gr.chip }}">{{ gr.state }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+    </main>
+  </div>
+
+  <!-- TOAST -->
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:50;animation:argusToast .3s ease;background:var(--text,#1b1a17);color:var(--bg,#f4f2ee);padding:11px 18px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 12px 40px -12px rgba(0,0,0,.5);display:flex;align-items:center;gap:9px;">
+      <span style="width:7px;height:7px;border-radius:50%;background:var(--green,#41b07f);"></span>
+      {{ toast }}
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:760},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#2A6FDB&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;startTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = {
+    theme: 'light',
+    nav: 'inbox',
+    tab: 'needs',
+    selectedId: 'm1',
+    editing: false,
+    editText: '',
+    decisions: {},
+    hoverSrc: null,
+    toast: null,
+    gapState: { g1: 'open', g2: 'open' },
+    audit: [
+      { time: '2h ago', actor: 'Lamjed', action: 'approved', detail: 'Reply sent to Priya Nair (partnership)', model: 'gpt-4o-mini' },
+      { time: '5h ago', actor: 'Argus', action: 'drafted', detail: 'Draft generated · 2 grounded facts', model: 'qwen2.5:14b' },
+      { time: 'Yesterday', actor: 'Sara', action: 'edited', detail: 'Edited draft before sending to Omar K.', model: '—' },
+      { time: 'Yesterday', actor: 'Argus', action: 'escalated', detail: 'Low confidence (0.31) · warranty question', model: 'qwen2.5:14b' },
+      { time: '2 days ago', actor: 'Lamjed', action: 'answered', detail: 'Filled gap: Store hours — Sfax branch', model: '—' },
+    ],
+  };
+
+  componentDidMount() {
+    if (this.props.startTheme === 'dark') this.setState({ theme: 'dark' });
+  }
+
+  themeVars() {
+    const accent = this.props.accent || '#2A6FDB';
+    const light = {
+      '--bg': '#f4f2ee', '--surface': '#ffffff', '--surface-2': '#faf8f4', '--inset': '#f0ede7',
+      '--border': '#e6e2d9', '--text': '#1b1a17', '--text-2': '#5f5c54', '--text-3': '#928e84',
+      '--accent': accent, '--accent-soft': '#eaf1fc',
+      '--green': '#1f8a5b', '--green-soft': '#e6f4ec', '--amber': '#a9701a', '--amber-soft': '#f6ecda',
+      '--red': '#bb3a2c', '--red-soft': '#f7e7e3',
+      '--shadow': '0 1px 2px rgba(20,18,12,.05), 0 10px 26px -16px rgba(20,18,12,.18)',
+    };
+    const dark = {
+      '--bg': '#101216', '--surface': '#181b21', '--surface-2': '#1e222a', '--inset': '#22262e',
+      '--border': '#2a2f38', '--text': '#edece8', '--text-2': '#a0a4ab', '--text-3': '#6c707a',
+      '--accent': '#6098f0', '--accent-soft': '#16243c',
+      '--green': '#41b07f', '--green-soft': '#13241b', '--amber': '#d6a24a', '--amber-soft': '#2a2210',
+      '--red': '#e06a5c', '--red-soft': '#2c1612',
+      '--shadow': '0 1px 2px rgba(0,0,0,.4), 0 12px 30px -16px rgba(0,0,0,.7)',
+    };
+    return this.state.theme === 'dark' ? dark : light;
+  }
+
+  FACTS = {
+    f1: { type: 'file', typeLabel: 'FILE', label: 'Shipping policy', ref: 'shipping-policy.pdf', time: 'updated 3d ago', conf: '0.96', content: 'International shipping to EU, US, UK & GCC. Standard EU delivery 4–7 business days via DHL with tracking.' },
+    f2: { type: 'db', typeLabel: 'DB', label: 'Product catalog', ref: 'orders_db · products', time: 'synced 2h ago', conf: '0.99', content: 'SKU TR-204 “Atlas Jacket” — colors: black, navy, red, olive. In stock: red ×38.' },
+    f3: { type: 'db', typeLabel: 'DB', label: 'Pricing', ref: 'orders_db · products', time: 'synced 2h ago', conf: '0.99', content: 'TR-204 “Atlas Jacket” price: 189 TND.' },
+    f4: { type: 'qa', typeLabel: 'Q&A', label: 'Returns window', ref: 'answered by Lamjed', time: '12d ago', conf: '0.90', content: 'Customers may return unworn items within 30 days for a full refund; prepaid label provided.' },
+  };
+
+  MSGS = [
+    { id: 'm1', sender: 'Marco Reinhardt', initials: 'MR', channel: 'Facebook', lang: 'en', langLabel: 'EN', intent: 'Pre-sales', urgency: 'Normal', time: '4m', model: 'gpt-4o-mini',
+      text: 'Hi! Do you ship to Germany, and how long does delivery usually take?',
+      conf: 0.94, factIds: ['f1'],
+      draft: "Hi Marco — yes, we ship to Germany. Standard delivery to the EU takes 4–7 business days via DHL [1], and you'll get a tracking link as soon as your order is dispatched. Anything else I can help with?" },
+    { id: 'm2', sender: 'ياسمين بن علي', initials: 'يب', channel: 'Facebook', lang: 'ar', langLabel: 'العربية', intent: 'Availability', urgency: 'Normal', time: '11m', model: 'qwen2.5:14b · local',
+      text: 'السلام عليكم، موديل "Atlas" متوفر باللون الأحمر؟ وبقدّاش الثمن؟',
+      conf: 0.91, factIds: ['f2', 'f3'],
+      draft: 'وعليكم السلام 🙏 إيه، موديل Atlas متوفّر باللون الأحمر [1]. الثمن متاعو 189 دينار [2]. تحبّ نحجزولك واحد؟' },
+    { id: 'm3', sender: 'Dana Okafor', initials: 'DO', channel: 'Webhook · Instagram', lang: 'en', langLabel: 'EN', intent: 'Refund', urgency: 'High', time: '26m', model: 'gpt-4o-mini',
+      text: "I ordered last week but the size doesn't fit. Can I get a refund?",
+      conf: 0.88, factIds: ['f4'],
+      draft: "Hi Dana — sorry it didn't fit! You can return unworn items within 30 days for a full refund [1]. I can email a prepaid return label to the address on your order — want me to send it?" },
+    { id: 'm4', sender: 'Tom Bradley', initials: 'TB', channel: 'Facebook', lang: 'en', langLabel: 'EN', intent: 'Support', urgency: 'Normal', time: '38m', model: 'qwen2.5:14b · local',
+      text: "What's the warranty period on the refurbished units?",
+      conf: 0.31, factIds: [], isGap: true, gapSlot: 'Warranty — refurbished units', gapId: 'g1',
+      draft: "I want to get this exactly right, and I don't have a confirmed answer on refurbished-unit warranty yet — let me check with the team and come right back to you." },
+    { id: 'm5', sender: 'Priya Nair', initials: 'PN', channel: 'Webhook · X', lang: 'en', langLabel: 'EN', intent: 'Partnership', urgency: 'Low', time: '2h', model: 'gpt-4o-mini', preSent: true,
+      text: "Love what you're building — are you open to partnership conversations?",
+      conf: 0.86, factIds: [],
+      draft: "Thanks Priya, that means a lot! We're definitely open to it — I'll loop in our team. What kind of partnership did you have in mind?" },
+  ];
+
+  // ---- helpers ----
+  confView(c) {
+    const pct = Math.round(c * 100) + '%';
+    if (c >= 0.85) return { pct, label: 'High confidence', color: 'var(--green,#1f8a5b)' };
+    if (c >= 0.60) return { pct, label: 'Medium confidence', color: 'var(--amber,#a9701a)' };
+    return { pct, label: 'Low confidence', color: 'var(--red,#bb3a2c)' };
+  }
+  typeChip(t) {
+    const map = { file: ['var(--accent,#2A6FDB)', 'var(--accent-soft,#eaf1fc)', 'FILE'], db: ['var(--green,#1f8a5b)', 'var(--green-soft,#e6f4ec)', 'DB'], qa: ['var(--amber,#a9701a)', 'var(--amber-soft,#f6ecda)', 'Q&A'] };
+    const [color, bg, label] = map[t] || map.file;
+    return { style: `font-size:9.5px;font-weight:700;letter-spacing:.04em;font-family:'IBM Plex Mono',monospace;color:${color};background:${bg};padding:2px 6px;border-radius:4px;flex:none;`, label, color, bg };
+  }
+  urgChip(u) {
+    const c = u === 'High' ? ['var(--red,#bb3a2c)', 'var(--red-soft,#f7e7e3)'] : u === 'Low' ? ['var(--text-3,#928e84)', 'var(--inset,#f0ede7)'] : ['var(--amber,#a9701a)', 'var(--amber-soft,#f6ecda)'];
+    return `font-size:10px;font-weight:600;color:${c[0]};background:${c[1]};padding:2px 6px;border-radius:4px;`;
+  }
+  actionChip(a) {
+    const m = { approved: 'green', drafted: 'accent', edited: 'amber', escalated: 'red', answered: 'green', rejected: 'red', asked: 'accent' };
+    const tone = m[a] || 'accent';
+    const tc = { green: ['var(--green,#1f8a5b)', 'var(--green-soft,#e6f4ec)'], accent: ['var(--accent,#2A6FDB)', 'var(--accent-soft,#eaf1fc)'], amber: ['var(--amber,#a9701a)', 'var(--amber-soft,#f6ecda)'], red: ['var(--red,#bb3a2c)', 'var(--red-soft,#f7e7e3)'] }[tone];
+    return `font-size:10.5px;font-weight:600;color:${tc[0]};background:${tc[1]};padding:2px 8px;border-radius:5px;justify-self:start;`;
+  }
+
+  // ---- handlers ----
+  select(id) { this.setState({ selectedId: id, editing: false }); }
+  toggleTheme(t) { this.setState({ theme: t }); }
+  setNav(n) { this.setState({ nav: n }); }
+  setTab(t) { this.setState({ tab: t }); }
+  startEdit() { const m = this.MSGS.find(x => x.id === this.state.selectedId); this.setState({ editing: true, editText: m.draft }); }
+  cancelEdit() { this.setState({ editing: false }); }
+  flash(msg) { this.setState({ toast: msg }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: null }), 2800); }
+
+  approve() {
+    const m = this.MSGS.find(x => x.id === this.state.selectedId);
+    const edited = this.state.editing;
+    const dec = { ...this.state.decisions, [m.id]: { action: 'sent', edited } };
+    const entry = { time: 'just now', actor: 'Lamjed', action: edited ? 'edited' : 'approved', detail: `Reply sent to ${m.sender} (${m.intent.toLowerCase()})`, model: m.model.split(' ')[0] };
+    this.setState({ decisions: dec, editing: false, audit: [entry, ...this.state.audit] });
+    this.flash(`Reply sent to ${m.sender}`);
+  }
+  reject() {
+    const m = this.MSGS.find(x => x.id === this.state.selectedId);
+    const dec = { ...this.state.decisions, [m.id]: { action: 'escalated' } };
+    const entry = { time: 'just now', actor: 'Lamjed', action: 'escalated', detail: `Escalated to a human · ${m.sender}`, model: '—' };
+    this.setState({ decisions: dec, audit: [entry, ...this.state.audit] });
+    this.flash('Escalated to a human — nothing was sent');
+  }
+  askTeam() {
+    const m = this.MSGS.find(x => x.id === this.state.selectedId);
+    if (m.gapId) { const gs = { ...this.state.gapState, [m.gapId]: 'asked' }; this.setState({ gapState: gs }); }
+    const entry = { time: 'just now', actor: 'Argus', action: 'asked', detail: `Asked the team: ${m.gapSlot}`, model: '—' };
+    this.setState({ audit: [entry, ...this.state.audit] });
+    this.flash('Question sent to the team');
+  }
+  askGap(id, slot) {
+    const gs = { ...this.state.gapState, [id]: 'asked' };
+    const entry = { time: 'just now', actor: 'Argus', action: 'asked', detail: `Asked the team: ${slot}`, model: '—' };
+    this.setState({ gapState: gs, audit: [entry, ...this.state.audit] });
+    this.flash('Question sent to the team');
+  }
+
+  renderVals() {
+    const s = this.state;
+    const vars = this.themeVars();
+    const rootStyle = { ...vars, height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', color: 'var(--text)', fontFamily: "'IBM Plex Sans','IBM Plex Sans Arabic',system-ui,sans-serif", overflow: 'hidden' };
+
+    // theme buttons
+    const segBase = "border:none;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:5px;transition:all .15s;";
+    const segOn = "background:var(--surface,#fff);color:var(--text,#1b1a17);box-shadow:0 1px 2px rgba(0,0,0,.1);";
+    const segOff = "background:transparent;color:var(--text-3,#928e84);";
+    const lightBtn = segBase + (s.theme === 'light' ? segOn : segOff);
+    const darkBtn = segBase + (s.theme === 'dark' ? "background:var(--surface-2,#1e222a);color:var(--text,#edece8);box-shadow:0 1px 2px rgba(0,0,0,.3);" : segOff);
+
+    // nav
+    const navItem = (id) => {
+      const on = s.nav === id;
+      return `display:flex;align-items:center;gap:10px;width:100%;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:${on ? 600 : 500};padding:8px 10px;border-radius:8px;margin-bottom:2px;transition:all .12s;background:${on ? 'var(--accent-soft,#eaf1fc)' : 'transparent'};color:${on ? 'var(--accent,#2A6FDB)' : 'var(--text-2,#5f5c54)'};`;
+    };
+    const ns = { inbox: navItem('inbox'), know: navItem('know'), gaps: navItem('gaps'), audit: navItem('audit'), settings: navItem('settings') };
+
+    const needsCount = this.MSGS.filter(m => !m.preSent && !s.decisions[m.id]).length;
+    const gapsOpen = Object.values(s.gapState).filter(v => v === 'open').length;
+    const navBadge = (tone) => `font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace;min-width:18px;text-align:center;padding:1px 5px;border-radius:9px;color:${tone};background:var(--surface-2,#faf8f4);`;
+    const badgeNeeds = `font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace;min-width:18px;text-align:center;padding:1px 5px;border-radius:9px;color:#fff;background:var(--accent,#2A6FDB);`;
+    const badgeGaps = `font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace;min-width:18px;text-align:center;padding:1px 5px;border-radius:9px;color:var(--red,#bb3a2c);background:var(--red-soft,#f7e7e3);`;
+
+    // tabs
+    const tabBase = "flex:1;border:none;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;padding:6px;border-radius:6px;transition:all .15s;";
+    const tabNeedsStyle = tabBase + (s.tab === 'needs' ? "background:var(--surface,#fff);color:var(--text,#1b1a17);box-shadow:0 1px 2px rgba(0,0,0,.08);" : "background:transparent;color:var(--text-3,#928e84);");
+    const tabSentStyle = tabBase + (s.tab === 'sent' ? "background:var(--surface,#fff);color:var(--text,#1b1a17);box-shadow:0 1px 2px rgba(0,0,0,.08);" : "background:transparent;color:var(--text-3,#928e84);");
+
+    // list
+    const inNeeds = (m) => !m.preSent && !s.decisions[m.id];
+    const source = s.tab === 'needs' ? this.MSGS.filter(inNeeds) : this.MSGS.filter(m => m.preSent || s.decisions[m.id]);
+    const list = source.map(m => {
+      const sel = m.id === s.selectedId;
+      const dec = s.decisions[m.id];
+      let statusLabel = '', statusTone = '';
+      if (m.preSent) { statusLabel = 'sent'; statusTone = 'green'; }
+      else if (dec && dec.action === 'sent') { statusLabel = dec.edited ? 'edited & sent' : 'sent'; statusTone = 'green'; }
+      else if (dec && dec.action === 'escalated') { statusLabel = 'escalated'; statusTone = 'red'; }
+      const stTone = statusTone === 'green' ? ['var(--green,#1f8a5b)', 'var(--green-soft,#e6f4ec)'] : ['var(--red,#bb3a2c)', 'var(--red-soft,#f7e7e3)'];
+      return {
+        id: m.id, sender: m.sender, time: m.time, snippet: m.text, channel: m.channel, langLabel: m.langLabel, urgency: m.urgency, dir: m.lang === 'ar' ? 'rtl' : 'ltr',
+        dot: m.isGap ? 'var(--red,#bb3a2c)' : (m.conf >= 0.85 ? 'var(--green,#1f8a5b)' : 'var(--amber,#a9701a)'),
+        urgStyle: this.urgChip(m.urgency),
+        statusLabel, statusStyle: statusLabel ? `font-size:9.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:${stTone[0]};background:${stTone[1]};padding:2px 6px;border-radius:4px;` : 'display:none;',
+        onSelect: () => this.select(m.id),
+        style: `display:block;width:100%;text-align:left;border:1px solid ${sel ? 'var(--accent,#2A6FDB)' : 'var(--border,#e6e2d9)'};cursor:pointer;font-family:inherit;background:${sel ? 'var(--accent-soft,#eaf1fc)' : 'var(--surface,#fff)'};border-radius:10px;padding:11px 12px;margin-bottom:7px;transition:border-color .12s,background .12s;`,
+      };
+    });
+
+    // selected
+    const m = this.MSGS.find(x => x.id === s.selectedId) || this.MSGS[0];
+    const cv = this.confView(m.conf);
+    const dec = s.decisions[m.id];
+    const isDecided = !!(m.preSent || dec);
+    let decidedTitle = '', decidedMeta = '', decidedTone = 'green';
+    if (m.preSent) { decidedTitle = '✓ Reply sent'; decidedMeta = `${m.channel} · 2h ago`; }
+    else if (dec && dec.action === 'sent') { decidedTitle = dec.edited ? '✓ Edited & sent' : '✓ Reply sent'; decidedMeta = `${m.channel} · just now · logged to audit`; }
+    else if (dec && dec.action === 'escalated') { decidedTitle = 'Escalated to a human'; decidedMeta = 'No reply was sent · logged to audit'; decidedTone = 'red'; }
+    const decTone = decidedTone === 'green' ? ['var(--green,#1f8a5b)', 'var(--green-soft,#e6f4ec)'] : ['var(--red,#bb3a2c)', 'var(--red-soft,#f7e7e3)'];
+    const decidedStyle = `margin-top:24px;border:1px solid ${decTone[0]};background:${decTone[1]};color:${decTone[0]};border-radius:11px;padding:14px 16px;`;
+
+    const sel = {
+      sender: m.sender, initials: m.initials, channel: m.channel, time: m.time + ' ago', intent: m.intent, urgency: m.urgency, langLabel: m.langLabel,
+      urgChip: `font-size:11px;font-weight:600;${this.urgChip(m.urgency)}`.replace('font-size:10px', 'font-size:11px').replace('padding:2px 6px', 'padding:3px 9px;border-radius:6px'),
+      dir: m.lang === 'ar' ? 'rtl' : 'ltr', text: m.text, model: m.model,
+      confPct: cv.pct, confLabel: cv.label, confColor: cv.color,
+      isGap: !!m.isGap, gapSlot: m.gapSlot || '',
+      draftShown: m.draft,
+    };
+
+    const selSources = m.factIds.map((fid, i) => {
+      const f = this.FACTS[fid];
+      const tc = this.typeChip(f.type);
+      const hi = s.hoverSrc === fid;
+      return {
+        marker: '[' + (i + 1) + ']', tagBg: hi ? 'var(--accent,#2A6FDB)' : 'var(--inset,#f0ede7)', tagColor: hi ? '#fff' : 'var(--text-2,#5f5c54)',
+        typeChip: tc.style, typeLabel: tc.label, label: f.label, ref: f.ref, content: f.content, time: f.time, conf: 'conf ' + f.conf,
+        onEnter: () => this.setState({ hoverSrc: fid }), onLeave: () => this.setState({ hoverSrc: null }),
+        style: `display:flex;gap:11px;align-items:flex-start;background:${hi ? 'var(--accent-soft,#eaf1fc)' : 'var(--surface,#fff)'};border:1px solid ${hi ? 'var(--accent,#2A6FDB)' : 'var(--border,#e6e2d9)'};border-radius:10px;padding:11px 13px;transition:all .12s;`,
+      };
+    });
+
+    // buttons
+    const btn = "border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;padding:9px 16px;border-radius:9px;transition:all .15s;display:inline-flex;align-items:center;gap:7px;";
+    const approveBtn = btn + "background:var(--accent,#2A6FDB);color:#fff;";
+    const primaryBtn = btn + "background:var(--accent,#2A6FDB);color:#fff;";
+    const ghostBtn = btn + "background:var(--inset,#f0ede7);color:var(--text,#1b1a17);";
+    const rejectBtn = btn + "background:transparent;color:var(--red,#bb3a2c);box-shadow:inset 0 0 0 1px var(--red,#bb3a2c);";
+    const askBtn = btn + "background:var(--red,#bb3a2c);color:#fff;font-size:12.5px;padding:7px 14px;";
+    const gapAsked = m.gapId && s.gapState[m.gapId] === 'asked';
+    const askLabel = gapAsked ? '✓ Asked the team' : 'Ask the team';
+
+    const approveLabel = m.isGap ? 'Send hold message' : 'Approve & send';
+    const rejectLabel = m.isGap ? 'Escalate' : 'Reject';
+
+    // knowledge
+    const connectors = [
+      { type: 'file', stat: '142 documents', sub: 'PDF, DOCX, MD · last added 3 days ago', status: 'Indexed' },
+      { type: 'db', stat: 'orders_db', sub: 'PostgreSQL · read-only · synced 2h ago', status: 'Read-only' },
+      { type: 'qa', stat: '37 answers', sub: 'From the team · last answered 12d ago', status: 'Live' },
+    ].map(c => ({ ...c, typeChip: this.typeChip(c.type).style, typeLabel: this.typeChip(c.type).label }));
+
+    const recentFacts = [
+      { type: 'file', content: 'Standard EU delivery 4–7 business days via DHL with tracking.', src: 'shipping-policy.pdf', time: '3d', conf: '0.96' },
+      { type: 'db', content: 'TR-204 “Atlas Jacket” in stock: red ×38.', src: 'orders_db · products', time: '2h', conf: '0.99' },
+      { type: 'qa', content: '30-day returns on unworn items, full refund + prepaid label.', src: 'answered by Lamjed', time: '12d', conf: '0.90' },
+      { type: 'db', content: 'Atlas (TR-204) price: 189 TND.', src: 'orders_db · products', time: '2h', conf: '0.99' },
+    ].map(f => ({ ...f, typeChip: this.typeChip(f.type).style, typeLabel: this.typeChip(f.type).label }));
+
+    const freshness = [
+      { label: 'Fresh (< 30d)', count: '118', pct: '74%', color: 'var(--green,#1f8a5b)' },
+      { label: 'Aging (30–90d)', count: '46', pct: '29%', color: 'var(--amber,#a9701a)' },
+      { label: 'Stale / review', count: '12', pct: '8%', color: 'var(--red,#bb3a2c)' },
+    ];
+
+    // gaps
+    const gapDefs = [
+      { id: 'g1', slot: 'Warranty — refurbished units', body: 'Detected from an unanswered customer question. Argus held the reply rather than guess.', meta: 'Detected from Tom Bradley · 38m ago', kind: 'q' },
+      { id: 'g2', slot: 'Bulk / wholesale pricing', body: 'Two inbound messages asked about wholesale orders over 50 units with no grounded fact to answer.', meta: 'Detected across 2 messages · this week', kind: 'q' },
+      { id: 'g3', slot: 'Store hours — Sfax branch', body: 'Answer: Mon–Sat, 9:00–19:00. Now grounded and available to drafts.', meta: 'Filled by Lamjed · 2d ago', kind: 'filled' },
+      { id: 'g4', slot: 'VAT on EU orders', body: 'Previously answered “VAT included for EU”, but the source is 6 months old and may be outdated.', meta: 'Flagged stale · needs re-confirmation', kind: 'stale' },
+    ];
+    const statusChipFor = (kind, asked) => {
+      if (kind === 'filled') return { label: 'filled', style: this.actionChip('answered') };
+      if (kind === 'stale') return { label: 'stale', style: `font-size:10.5px;font-weight:600;color:var(--amber,#a9701a);background:var(--amber-soft,#f6ecda);padding:2px 8px;border-radius:5px;` };
+      return asked ? { label: 'asked', style: this.actionChip('asked') } : { label: 'open', style: `font-size:10.5px;font-weight:600;color:var(--red,#bb3a2c);background:var(--red-soft,#f7e7e3);padding:2px 8px;border-radius:5px;` };
+    };
+    const gaps = gapDefs.map(g => {
+      const asked = s.gapState[g.id] === 'asked';
+      const sc = statusChipFor(g.kind, asked);
+      let btnLabel = 'Ask the team', btnDisabledTone = false, onAct = () => this.askGap(g.id, g.slot);
+      if (g.kind === 'filled') { btnLabel = 'View fact'; onAct = () => this.setState({ nav: 'know' }); }
+      else if (g.kind === 'stale') { btnLabel = 'Re-confirm'; onAct = () => this.askGap(g.id, g.slot); }
+      else if (asked) { btnLabel = '✓ Asked'; }
+      const btnStyle = `border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;padding:6px 13px;border-radius:7px;flex:none;` + (g.kind === 'filled' ? 'background:var(--inset,#f0ede7);color:var(--text,#1b1a17);' : asked ? 'background:var(--accent-soft,#eaf1fc);color:var(--accent,#2A6FDB);' : 'background:var(--accent,#2A6FDB);color:#fff;');
+      return { slot: g.slot, body: g.body, meta: g.meta, statusLabel: sc.label, statusChip: sc.style, btnLabel, btnStyle, onAct };
+    });
+
+    // audit
+    const audit = s.audit.map(a => ({ ...a, chip: this.actionChip(a.action) }));
+
+    // settings
+    const llmFields = [
+      { label: 'Gateway', value: 'LiteLLM' },
+      { label: 'Primary model', value: 'gpt-4o-mini' },
+      { label: 'Local model (Darija)', value: 'qwen2.5:14b · Ollama' },
+      { label: 'Embeddings', value: 'text-embedding-3-small → pgvector' },
+      { label: 'Confidence threshold', value: '0.60' },
+    ];
+    const channels = [
+      { name: 'Facebook Messenger', kind: 'inbound', detail: 'Page @yourstore · webhook verified', status: 'Connected' },
+      { name: 'Generic webhook', kind: 'inbound', detail: 'POST /ingest/webhook · HMAC verified', status: 'Active' },
+      { name: 'Slack', kind: 'approval surface', detail: 'Approvals posted to #argus-approvals', status: 'Connected' },
+    ];
+    const grChip = (locked) => `font-size:10.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:${locked ? 'var(--green,#1f8a5b)' : 'var(--green,#1f8a5b)'};background:var(--green-soft,#e6f4ec);padding:3px 9px;border-radius:6px;flex:none;`;
+    const guardrails = [
+      { label: 'No public send without human approval', note: 'Non-overridable in Phase A', state: 'Enforced', chip: grChip(true) },
+      { label: 'Grounded-only drafting', note: 'Below 0.60 confidence → escalate, never invent', state: 'On', chip: grChip(false) },
+      { label: 'Read-only database access', note: 'Zero write capability on connected DBs', state: 'Enforced', chip: grChip(true) },
+      { label: 'Append-only audit log', note: 'Every message, model & human decision', state: 'On', chip: grChip(false) },
+      { label: 'Model whitelist (privacy)', note: "Data never leaves the configured models", state: 'On', chip: grChip(false) },
+    ];
+
+    return {
+      rootStyle, lightBtn, darkBtn, setLight: () => this.toggleTheme('light'), setDark: () => this.toggleTheme('dark'),
+      ns, navInbox: () => this.setNav('inbox'), navKnow: () => this.setNav('know'), navGaps: () => this.setNav('gaps'), navAudit: () => this.setNav('audit'), navSettings: () => this.setNav('settings'),
+      needsCount, gapsOpen, badgeNeeds, badgeGaps,
+      isInbox: s.nav === 'inbox', isKnow: s.nav === 'know', isGaps: s.nav === 'gaps', isAudit: s.nav === 'audit', isSettings: s.nav === 'settings',
+      tabNeeds: () => this.setTab('needs'), tabSent: () => this.setTab('sent'), tabNeedsStyle, tabSentStyle,
+      list, listEmpty: list.length === 0,
+      sel, selSources, hasSources: selSources.length > 0, sourceCount: selSources.length,
+      editing: s.editing, editText: s.editText, onEdit: (e) => this.setState({ editText: e.target.value }),
+      showDraft: !s.editing,
+      showActions: !isDecided, showMainActions: !s.editing,
+      approve: () => this.approve(), reject: () => this.reject(), startEdit: () => this.startEdit(), cancelEdit: () => this.cancelEdit(), askTeam: () => this.askTeam(),
+      approveBtn, primaryBtn, ghostBtn, rejectBtn, askBtn, askLabel, approveLabel, rejectLabel,
+      isDecided, decidedStyle, decidedTitle, decidedMeta,
+      connectors, recentFacts, freshness, gaps, audit, llmFields, channels, guardrails,
+      toast: s.toast,
+    };
+  }
+}
+</script>
+</body>
+</html>
