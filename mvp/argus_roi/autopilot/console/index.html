@@ -30,6 +30,35 @@
 
 <div style="{{ rootStyle }}">
 
+  <!-- LOGIN -->
+  <sc-if value="{{ notAuthed }}" hint-placeholder-val="{{ false }}">
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px;">
+    <div style="width:384px;max-width:100%;animation:argusFade .3s ease;">
+      <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:20px;">
+        <svg width="26" height="26" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8.2" stroke="var(--accent,#2A6FDB)" stroke-width="1.6"/><circle cx="11" cy="11" r="3" fill="var(--accent,#2A6FDB)"/></svg>
+        <span style="font-size:20px;font-weight:600;letter-spacing:-.01em;color:var(--text,#1b1a17);">Argus</span>
+      </div>
+      <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:16px;padding:28px;box-shadow:var(--shadow);">
+        <h1 style="font-size:18px;font-weight:600;text-align:center;margin:0 0 5px;color:var(--text,#1b1a17);">Sign in to your workspace</h1>
+        <p style="font-size:12px;color:var(--text-3,#928e84);text-align:center;margin:0 0 22px;line-height:1.5;">Self-hosted · your data never leaves this machine</p>
+        <label style="display:block;font-size:11px;font-weight:600;color:var(--text-2,#5f5c54);margin-bottom:6px;">Workspace</label>
+        <input type="text" defaultValue="yourstore" style="width:100%;border:1px solid var(--border,#e6e2d9);background:var(--bg,#f4f2ee);border-radius:9px;padding:10px 12px;font-family:inherit;font-size:13.5px;color:var(--text,#1b1a17);outline:none;margin-bottom:14px;box-sizing:border-box;" />
+        <label style="display:block;font-size:11px;font-weight:600;color:var(--text-2,#5f5c54);margin-bottom:6px;">Email</label>
+        <input type="email" defaultValue="lamjed@intigo.tn" style="width:100%;border:1px solid var(--border,#e6e2d9);background:var(--bg,#f4f2ee);border-radius:9px;padding:10px 12px;font-family:inherit;font-size:13.5px;color:var(--text,#1b1a17);outline:none;margin-bottom:14px;box-sizing:border-box;" />
+        <label style="display:block;font-size:11px;font-weight:600;color:var(--text-2,#5f5c54);margin-bottom:6px;">Password</label>
+        <input type="password" defaultValue="argus-demo" style="width:100%;border:1px solid var(--border,#e6e2d9);background:var(--bg,#f4f2ee);border-radius:9px;padding:10px 12px;font-family:inherit;font-size:13.5px;color:var(--text,#1b1a17);outline:none;margin-bottom:18px;box-sizing:border-box;" />
+        <button onClick="{{ signIn }}" style="width:100%;border:none;cursor:pointer;font-family:inherit;font-size:14px;font-weight:600;background:var(--accent,#2A6FDB);color:#fff;padding:11px;border-radius:9px;">Sign in</button>
+        <div style="display:flex;align-items:center;gap:10px;margin:16px 0;"><div style="flex:1;height:1px;background:var(--border,#e6e2d9);"></div><span style="font-size:10.5px;color:var(--text-3,#928e84);font-family:'IBM Plex Mono',monospace;">or</span><div style="flex:1;height:1px;background:var(--border,#e6e2d9);"></div></div>
+        <button onClick="{{ signIn }}" style="width:100%;border:1px solid var(--border,#e6e2d9);cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:600;background:var(--surface,#fff);color:var(--text,#1b1a17);padding:10px;border-radius:9px;">Continue with SSO</button>
+      </div>
+      <p style="font-size:11.5px;color:var(--text-3,#928e84);text-align:center;margin:16px 0 0;">New here? Ask your admin for an invite · <span style="font-family:'IBM Plex Mono',monospace;">docs/setup</span></p>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- APP -->
+  <sc-if value="{{ authed }}" hint-placeholder-val="{{ true }}">
+
   <!-- TOP BAR -->
   <header style="display:flex;align-items:center;gap:18px;height:56px;flex:none;padding:0 18px;border-bottom:1px solid var(--border,#e6e2d9);background:var(--surface,#fff);">
     <div style="display:flex;align-items:center;gap:9px;">
@@ -44,13 +73,34 @@
       <button onClick="{{ setLight }}" style="{{ lightBtn }}">Light</button>
       <button onClick="{{ setDark }}" style="{{ darkBtn }}">Dark</button>
     </div>
-    <div style="width:30px;height:30px;border-radius:50%;background:var(--accent,#2A6FDB);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600;">LG</div>
+    <button onClick="{{ signOut }}" title="Sign out" style="width:30px;height:30px;border:none;cursor:pointer;border-radius:50%;background:var(--accent,#2A6FDB);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600;font-family:inherit;">LG</button>
   </header>
 
   <div style="display:flex;flex:1;min-height:0;">
 
     <!-- SIDEBAR -->
     <nav style="width:228px;flex:none;border-right:1px solid var(--border,#e6e2d9);background:var(--surface,#fff);display:flex;flex-direction:column;padding:14px 12px;">
+      <div style="position:relative;flex:none;margin-bottom:10px;">
+        <button onClick="{{ toggleEnvMenu }}" style="display:flex;align-items:center;gap:10px;width:100%;border:1px solid var(--border,#e6e2d9);background:var(--surface-2,#faf8f4);cursor:pointer;font-family:inherit;padding:8px 11px;border-radius:10px;">
+          <span style="width:10px;height:10px;border-radius:3px;flex:none;background:{{ envColor }};"></span>
+          <span style="flex:1;text-align:left;min-width:0;">
+            <span style="display:block;font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3,#928e84);">Environment</span>
+            <span style="display:block;font-size:13px;font-weight:600;color:var(--text,#1b1a17);">{{ envName }}</span>
+          </span>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--text-3,#928e84)" stroke-width="1.6"><path d="M3.5 5.5l3.5 3.5 3.5-3.5"/></svg>
+        </button>
+        <sc-if value="{{ envOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:20;background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:11px;box-shadow:var(--shadow);padding:5px;">
+            <sc-for list="{{ envOptions }}" as="e" hint-placeholder-count="4">
+              <button onClick="{{ e.onClick }}" style="{{ e.style }}">
+                <span style="width:9px;height:9px;border-radius:3px;flex:none;background:{{ e.color }};"></span>
+                <span style="flex:1;text-align:left;">{{ e.name }}</span>
+                <sc-if value="{{ e.active }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7.5l2.5 2.5 5.5-6"/></svg></sc-if>
+              </button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
       <div style="flex:1;overflow-y:auto;margin:0 -4px;padding:0 4px;">
       <div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--text-3,#928e84);text-transform:uppercase;padding:4px 10px 6px;">Operate</div>
       <button onClick="{{ navInbox }}" style="{{ ns.inbox }}">
@@ -63,11 +113,28 @@
         <span style="flex:1;text-align:left;">Ask Argus</span>
       </button>
 
-      <div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--text-3,#928e84);text-transform:uppercase;padding:14px 10px 6px;">Pipeline</div>
+      <div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--text-3,#928e84);text-transform:uppercase;padding:14px 10px 6px;">Teams</div>
+      <button onClick="{{ navPipelines }}" style="{{ ns.pipelines }}">
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M8 4v12M12.5 4v12"/></svg>
+        <span style="flex:1;text-align:left;">Pipelines</span>
+        <span style="{{ badgePipelines }}">{{ openTicketsCount }}</span>
+      </button>
+      <button onClick="{{ navMembers }}" style="{{ ns.members }}">
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7.5" cy="8" r="2.3"/><circle cx="13" cy="8.5" r="2"/><path d="M3.5 15.5c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5"/><path d="M13 12c2 0 3.5 1.2 3.5 3.3"/></svg>
+        <span style="flex:1;text-align:left;">Members</span>
+        <span style="font-size:9.5px;font-weight:600;color:var(--text-3,#928e84);font-family:'IBM Plex Mono',monospace;">{{ membersCount }}</span>
+      </button>
+
+      <div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--text-3,#928e84);text-transform:uppercase;padding:14px 10px 6px;">Engine</div>
       <button onClick="{{ navConnectors }}" style="{{ ns.connectors }}">
         <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 2.5v3M13 2.5v3"/><rect x="5" y="5.5" width="10" height="6" rx="2"/><path d="M10 11.5v6"/></svg>
         <span style="flex:1;text-align:left;">Connectors</span>
         <span style="font-size:9.5px;font-weight:600;color:var(--text-3,#928e84);font-family:'IBM Plex Mono',monospace;">in</span>
+      </button>
+      <button onClick="{{ navModels }}" style="{{ ns.models }}">
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/><rect x="8.5" y="8.5" width="3" height="3"/><path d="M8 2.5v3M12 2.5v3M8 14.5v3M12 14.5v3M2.5 8h3M2.5 12h3M14.5 8h3M14.5 12h3"/></svg>
+        <span style="flex:1;text-align:left;">Models</span>
+        <span style="{{ badgeModels }}">{{ connectedCount }}</span>
       </button>
       <button onClick="{{ navAgents }}" style="{{ ns.agents }}">
         <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="6" width="12" height="9" rx="2.5"/><circle cx="8" cy="10.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="10.5" r="1" fill="currentColor" stroke="none"/><path d="M10 3v3"/></svg>
@@ -83,6 +150,10 @@
       <button onClick="{{ navKnow }}" style="{{ ns.know }}">
         <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4.5h6.5a2 2 0 0 1 2 2V16H6a2 2 0 0 1-2-2z"/><path d="M16 4.5h-3.5"/></svg>
         <span style="flex:1;text-align:left;">Knowledge core</span>
+      </button>
+      <button onClick="{{ navTeach }}" style="{{ ns.teach }}">
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 12.5V4M10 4L6.5 7.5M10 4l3.5 3.5"/><path d="M4 13.5v1.5A1.5 1.5 0 0 0 5.5 16.5h9a1.5 1.5 0 0 0 1.5-1.5v-1.5"/></svg>
+        <span style="flex:1;text-align:left;">Teach Argus</span>
       </button>
       <button onClick="{{ navGaps }}" style="{{ ns.gaps }}">
         <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3.5" width="14" height="10" rx="2.5"/><path d="M7 13.5l-2 3v-3"/><path d="M8.4 7.2a1.6 1.6 0 1 1 2.2 1.5c-.5.2-.6.5-.6 1"/><circle cx="10" cy="11.1" r=".5" fill="currentColor" stroke="none"/></svg>
@@ -203,7 +274,7 @@
 
             <!-- draft / editor -->
             <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
-              <textarea dir="{{ sel.dir }}" value="{{ editText }}" onInput="{{ onEdit }}" style="width:100%;min-height:120px;resize:vertical;background:var(--surface,#fff);border:1.5px solid var(--accent,#2A6FDB);border-radius:12px;padding:15px 17px;font-size:14.5px;line-height:1.6;color:var(--text,#1b1a17);text-align:start;outline:none;box-shadow:0 0 0 4px var(--accent-soft,#eaf1fc);"></textarea>
+              <textarea dir="{{ sel.dir }}" value="{{ editText }}" onChange="{{ onEdit }}" style="width:100%;min-height:120px;resize:vertical;background:var(--surface,#fff);border:1.5px solid var(--accent,#2A6FDB);border-radius:12px;padding:15px 17px;font-size:14.5px;line-height:1.6;color:var(--text,#1b1a17);text-align:start;outline:none;box-shadow:0 0 0 4px var(--accent-soft,#eaf1fc);"></textarea>
             </sc-if>
             <sc-if value="{{ showDraft }}" hint-placeholder-val="{{ true }}">
               <div dir="{{ sel.dir }}" style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:12px;padding:15px 17px;font-size:14.5px;line-height:1.65;color:var(--text,#1b1a17);text-align:start;white-space:pre-wrap;box-shadow:var(--shadow);">{{ sel.draftShown }}</div>
@@ -340,12 +411,162 @@
         <!-- composer -->
         <div style="flex:none;border-top:1px solid var(--border,#e6e2d9);background:var(--surface,#fff);padding:14px 24px 16px;">
           <div style="max-width:720px;margin:0 auto;display:flex;align-items:flex-end;gap:9px;background:var(--bg,#f4f2ee);border:1.5px solid var(--border,#e6e2d9);border-radius:14px;padding:7px 7px 7px 16px;">
-            <textarea dir="{{ chatDir }}" value="{{ chatInput }}" onInput="{{ onChatInput }}" onKeyDown="{{ onChatKey }}" placeholder="Ask anything about your business…" rows="1" style="flex:1;border:none;background:transparent;resize:none;outline:none;font-family:inherit;font-size:14px;line-height:1.5;color:var(--text,#1b1a17);padding:8px 0;max-height:140px;text-align:start;"></textarea>
+            <textarea dir="{{ chatDir }}" value="{{ chatInput }}" onChange="{{ onChatInput }}" onKeyDown="{{ onChatKey }}" placeholder="Ask anything about your business…" rows="1" style="flex:1;border:none;background:transparent;resize:none;outline:none;font-family:inherit;font-size:14px;line-height:1.5;color:var(--text,#1b1a17);padding:8px 0;max-height:140px;text-align:start;"></textarea>
             <button onClick="{{ sendChat }}" style="{{ sendBtn }}">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 13V3.5M8 3.5l-4 4M8 3.5l4 4"/></svg>
             </button>
           </div>
           <div style="max-width:720px;margin:8px auto 0;text-align:center;font-size:10.5px;color:var(--text-3,#928e84);font-family:'IBM Plex Mono',monospace;">Answers grounded in your private knowledge core · {{ chatModel }}</div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ PIPELINES (KANBAN) ============ -->
+      <sc-if value="{{ isPipelines }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+        <div style="flex:none;padding:24px 30px 16px;">
+          <h1 style="font-size:21px;font-weight:600;color:var(--text,#1b1a17);margin:0 0 4px;letter-spacing:-.01em;">Pipelines</h1>
+          <p style="font-size:13.5px;color:var(--text-2,#5f5c54);margin:0;max-width:680px;">Tickets opened from inbound messages — routed to the right team. Argus suggests an owner and which actions an agent can run vs. a person. Use the environment switcher to filter by team.</p>
+        </div>
+        <div style="flex:1;overflow-x:auto;overflow-y:hidden;padding:4px 30px 30px;">
+          <div style="display:flex;gap:16px;height:100%;align-items:flex-start;">
+            <sc-for list="{{ kanbanCols }}" as="col" hint-placeholder-count="5">
+              <div style="flex:none;width:280px;display:flex;flex-direction:column;max-height:100%;">
+                <div style="display:flex;align-items:center;gap:8px;padding:0 4px 10px;">
+                  <span style="font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--text,#1b1a17);">{{ col.label }}</span>
+                  <span style="font-size:10.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);background:var(--inset,#f0ede7);min-width:18px;text-align:center;padding:1px 6px;border-radius:9px;">{{ col.count }}</span>
+                </div>
+                <div style="flex:1;overflow-y:auto;background:var(--surface-2,#faf8f4);border:1px solid var(--border,#e6e2d9);border-radius:12px;padding:9px;">
+                  <sc-for list="{{ col.tickets }}" as="t" hint-placeholder-count="2">
+                    <button onClick="{{ t.onClick }}" style="{{ t.cardStyle }}">
+                      <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
+                        <span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ t.prioColor }};"></span>
+                        <span style="font-size:9.5px;font-weight:500;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);padding:2px 6px;border-radius:4px;">{{ t.source }}</span>
+                        <div style="flex:1;"></div>
+                        <span style="display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:600;color:var(--text-3,#928e84);"><span style="width:7px;height:7px;border-radius:2px;background:{{ t.envColor }};"></span>{{ t.envName }}</span>
+                      </div>
+                      <div style="font-size:13px;font-weight:600;line-height:1.4;color:var(--text,#1b1a17);margin-bottom:10px;">{{ t.title }}</div>
+                      <div style="display:flex;align-items:center;gap:7px;">
+                        <sc-if value="{{ t.hasAssignee }}" hint-placeholder-val="{{ false }}">
+                          <div style="{{ t.assigneeStyle }}">{{ t.assigneeInitials }}</div>
+                          <span style="font-size:11px;color:var(--text-2,#5f5c54);flex:1;">{{ t.assigneeName }}</span>
+                        </sc-if>
+                        <sc-if value="{{ t.suggested }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--accent,#2A6FDB);background:var(--accent-soft,#eaf1fc);padding:3px 8px;border-radius:6px;"><svg width="11" height="11" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8.2" stroke="currentColor" stroke-width="2"/><circle cx="11" cy="11" r="3" fill="currentColor"/></svg>Suggested owner</span>
+                        </sc-if>
+                      </div>
+                    </button>
+                  </sc-for>
+                  <sc-if value="{{ col.empty }}" hint-placeholder-val="{{ false }}">
+                    <div style="text-align:center;padding:22px 10px;color:var(--text-3,#928e84);font-size:11.5px;">No tickets</div>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ MEMBERS ============ -->
+      <sc-if value="{{ isMembers }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;overflow-y:auto;padding:30px 36px 60px;">
+        <div style="max-width:880px;margin:0 auto;">
+          <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:22px;">
+            <div style="flex:1;">
+              <h1 style="font-size:21px;font-weight:600;color:var(--text,#1b1a17);margin:0 0 4px;letter-spacing:-.01em;">Members</h1>
+              <p style="font-size:13.5px;color:var(--text-2,#5f5c54);margin:0;max-width:600px;">Each environment has its own team. Argus reads each member’s role, skills and current load to route tickets to the right person.</p>
+            </div>
+            <button onClick="{{ toggleAddMember }}" style="flex:none;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;background:var(--accent,#2A6FDB);color:#fff;padding:9px 15px;border-radius:9px;">+ Invite member</button>
+          </div>
+
+          <sc-if value="{{ addingMember }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--surface,#fff);border:1px solid var(--accent,#2A6FDB);border-radius:13px;padding:18px;margin-bottom:18px;box-shadow:var(--shadow);">
+              <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:14px;">Invite a team member</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                <div><label style="display:block;font-size:11px;font-weight:600;color:var(--text-2,#5f5c54);margin-bottom:5px;">Name</label><input type="text" value="{{ nmName }}" onChange="{{ onNmName }}" placeholder="Full name" style="width:100%;border:1px solid var(--border,#e6e2d9);background:var(--bg,#f4f2ee);border-radius:8px;padding:9px 11px;font-family:inherit;font-size:13px;color:var(--text,#1b1a17);outline:none;box-sizing:border-box;" /></div>
+                <div><label style="display:block;font-size:11px;font-weight:600;color:var(--text-2,#5f5c54);margin-bottom:5px;">Role</label><input type="text" value="{{ nmRole }}" onChange="{{ onNmRole }}" placeholder="e.g. Recruiter" style="width:100%;border:1px solid var(--border,#e6e2d9);background:var(--bg,#f4f2ee);border-radius:8px;padding:9px 11px;font-family:inherit;font-size:13px;color:var(--text,#1b1a17);outline:none;box-sizing:border-box;" /></div>
+              </div>
+              <div style="margin-bottom:12px;"><label style="display:block;font-size:11px;font-weight:600;color:var(--text-2,#5f5c54);margin-bottom:5px;">Skills <span style="font-weight:400;color:var(--text-3,#928e84);">(comma separated — Argus routes on these)</span></label><input type="text" value="{{ nmSkills }}" onChange="{{ onNmSkills }}" placeholder="CV screening, interviews, sourcing" style="width:100%;border:1px solid var(--border,#e6e2d9);background:var(--bg,#f4f2ee);border-radius:8px;padding:9px 11px;font-family:inherit;font-size:13px;color:var(--text,#1b1a17);outline:none;box-sizing:border-box;" /></div>
+              <div style="margin-bottom:16px;"><label style="display:block;font-size:11px;font-weight:600;color:var(--text-2,#5f5c54);margin-bottom:6px;">Environment</label><div style="display:flex;gap:8px;"><sc-for list="{{ nmEnvOptions }}" as="eo" hint-placeholder-count="3"><button onClick="{{ eo.onClick }}" style="{{ eo.style }}">{{ eo.name }}</button></sc-for></div></div>
+              <div style="display:flex;gap:9px;"><button onClick="{{ saveMember }}" style="border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;background:var(--accent,#2A6FDB);color:#fff;padding:9px 16px;border-radius:8px;">Add member</button><button onClick="{{ toggleAddMember }}" style="border:1px solid var(--border,#e6e2d9);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;background:var(--surface,#fff);color:var(--text,#1b1a17);padding:9px 16px;border-radius:8px;">Cancel</button></div>
+            </div>
+          </sc-if>
+
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:13px;">
+            <sc-for list="{{ membersFiltered }}" as="m" hint-placeholder-count="4">
+              <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:16px;box-shadow:var(--shadow);">
+                <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;">
+                  <div style="{{ m.avatarStyle }}">{{ m.initials }}</div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:14.5px;font-weight:600;color:var(--text,#1b1a17);">{{ m.name }}</div>
+                    <div style="font-size:12px;color:var(--text-2,#5f5c54);margin-top:1px;">{{ m.role }}</div>
+                  </div>
+                  <span style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:{{ m.statusColor }};"><span style="width:6px;height:6px;border-radius:50%;background:{{ m.statusColor }};"></span>{{ m.statusLabel }}</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
+                  <sc-for list="{{ m.skills }}" as="sk" hint-placeholder-count="3">
+                    <span style="font-size:10.5px;font-weight:500;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);padding:3px 9px;border-radius:6px;">{{ sk }}</span>
+                  </sc-for>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;border-top:1px solid var(--border,#e6e2d9);padding-top:11px;">
+                  <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--text-2,#5f5c54);"><span style="width:8px;height:8px;border-radius:2px;background:{{ m.envColor }};"></span>{{ m.envName }}</span>
+                  <div style="flex:1;"></div>
+                  <span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);">{{ m.open }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ TEACH ARGUS ============ -->
+      <sc-if value="{{ isTeach }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;overflow-y:auto;padding:30px 36px 60px;">
+        <div style="max-width:860px;margin:0 auto;">
+          <h1 style="font-size:21px;font-weight:600;color:var(--text,#1b1a17);margin:0 0 4px;letter-spacing:-.01em;">Teach Argus</h1>
+          <p style="font-size:13.5px;color:var(--text-2,#5f5c54);margin:0 0 24px;max-width:640px;">Grow the knowledge core. Drop in files or answer a question once — Argus turns it into grounded facts it can cite in every future reply. Nothing is invented; it only answers from what you teach it.</p>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:30px;">
+            <!-- upload -->
+            <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:18px;box-shadow:var(--shadow);">
+              <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:4px;">Upload files</div>
+              <div style="font-size:11.5px;color:var(--text-3,#928e84);margin-bottom:14px;">PDF, DOCX, MD, TXT, CSV — parsed and embedded into pgvector.</div>
+              <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;border:1.5px dashed var(--border-2,#d8d3c8);border-radius:11px;padding:26px 16px;cursor:pointer;background:var(--bg,#f4f2ee);text-align:center;" style-hover="border-color:var(--accent,#2A6FDB);">
+                <svg width="26" height="26" viewBox="0 0 20 20" fill="none" stroke="var(--accent,#2A6FDB)" stroke-width="1.5"><path d="M10 13.5V4M10 4L6.5 7.5M10 4l3.5 3.5"/><path d="M3.5 13.5v2A1.5 1.5 0 0 0 5 17h10a1.5 1.5 0 0 0 1.5-1.5v-2"/></svg>
+                <span style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);">Drag files here or browse</span>
+                <span style="font-size:11px;color:var(--text-3,#928e84);">Held privately on this machine</span>
+                <input type="file" multiple onChange="{{ onFiles }}" style="display:none;" />
+              </label>
+            </div>
+
+            <!-- Q&A -->
+            <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;">
+              <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:4px;">Answer a question</div>
+              <div style="font-size:11.5px;color:var(--text-3,#928e84);margin-bottom:14px;">Teach a single fact as a question &amp; answer pair.</div>
+              <input type="text" value="{{ qaQ }}" onChange="{{ onQaQ }}" placeholder="Question — e.g. Do you offer wholesale pricing?" style="width:100%;border:1px solid var(--border,#e6e2d9);background:var(--bg,#f4f2ee);border-radius:9px;padding:9px 12px;font-family:inherit;font-size:13px;color:var(--text,#1b1a17);outline:none;margin-bottom:10px;box-sizing:border-box;" />
+              <textarea value="{{ qaA }}" onChange="{{ onQaA }}" placeholder="Answer — the grounded fact Argus should use…" style="width:100%;flex:1;min-height:72px;resize:vertical;border:1px solid var(--border,#e6e2d9);background:var(--bg,#f4f2ee);border-radius:9px;padding:9px 12px;font-family:inherit;font-size:13px;line-height:1.5;color:var(--text,#1b1a17);outline:none;margin-bottom:12px;box-sizing:border-box;"></textarea>
+              <button onClick="{{ teachQA }}" style="border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;background:var(--accent,#2A6FDB);color:#fff;padding:10px;border-radius:9px;">Teach Argus</button>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:13px;">
+            <span style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text,#1b1a17);">Recently taught</span>
+            <div style="flex:1;height:1px;background:var(--border,#e6e2d9);"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:9px;">
+            <sc-for list="{{ taught }}" as="t" hint-placeholder-count="2">
+              <div style="display:flex;align-items:flex-start;gap:11px;background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:11px;padding:13px 15px;box-shadow:var(--shadow);">
+                <span style="{{ t.kindChip }}">{{ t.kindLabel }}</span>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:13.5px;font-weight:600;color:var(--text,#1b1a17);line-height:1.4;">{{ t.label }}</div>
+                  <div style="font-size:12px;color:var(--text-2,#5f5c54);margin-top:2px;line-height:1.45;">{{ t.detail }}</div>
+                </div>
+                <span style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);white-space:nowrap;">{{ t.time }}</span>
+              </div>
+            </sc-for>
+          </div>
         </div>
       </div>
       </sc-if>
@@ -527,6 +748,110 @@
       </div>
       </sc-if>
 
+      <!-- ============ MODELS (LLM GATEWAY) ============ -->
+      <sc-if value="{{ isModels }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;overflow-y:auto;padding:30px 36px 60px;">
+        <div style="max-width:920px;margin:0 auto;">
+          <h1 style="font-size:21px;font-weight:600;color:var(--text,#1b1a17);margin:0 0 4px;letter-spacing:-.01em;">Models</h1>
+          <p style="font-size:13.5px;color:var(--text-2,#5f5c54);margin:0 0 20px;max-width:640px;">Connect any LLM — cloud or local — through the LiteLLM gateway. Switch or add providers without touching code. Your data never leaves a model you haven't whitelisted.</p>
+
+          <div style="display:flex;align-items:center;gap:12px;background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:12px;padding:14px 16px;margin-bottom:26px;box-shadow:var(--shadow);">
+            <div style="width:36px;height:36px;border-radius:9px;background:var(--accent-soft,#eaf1fc);display:flex;align-items:center;justify-content:center;flex:none;">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="var(--accent,#2A6FDB)" stroke-width="1.5"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/><rect x="8.5" y="8.5" width="3" height="3"/><path d="M8 2.5v3M12 2.5v3M8 14.5v3M12 14.5v3M2.5 8h3M2.5 12h3M14.5 8h3M14.5 12h3"/></svg>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:13.5px;font-weight:600;color:var(--text,#1b1a17);">LiteLLM gateway</div>
+              <div style="font-size:11.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);margin-top:1px;">one API for every provider · OpenAI-compatible</div>
+            </div>
+            <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--green,#1f8a5b);background:var(--green-soft,#e6f4ec);padding:5px 11px;border-radius:7px;"><span style="width:7px;height:7px;border-radius:50%;background:var(--green,#1f8a5b);"></span>{{ connectedCount }} connected</span>
+          </div>
+
+          <!-- routing -->
+          <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:18px 20px;margin-bottom:30px;box-shadow:var(--shadow);">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+              <span style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);flex:1;">Default routing</span>
+              <span style="font-size:9.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--amber,#a9701a);background:var(--amber-soft,#f6ecda);padding:3px 8px;border-radius:5px;font-family:'IBM Plex Mono',monospace;">Multi-model routing · Pro</span>
+            </div>
+            <div style="font-size:11.5px;color:var(--text-3,#928e84);margin-bottom:6px;">Which model handles each step of the pipeline.</div>
+            <sc-for list="{{ routing }}" as="r" hint-placeholder-count="5">
+              <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--border,#e6e2d9);">
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:13px;font-weight:500;color:var(--text,#1b1a17);">{{ r.role }}</div>
+                  <div style="font-size:11px;color:var(--text-3,#928e84);margin-top:1px;">{{ r.note }}</div>
+                </div>
+                <button onClick="{{ r.onClick }}" style="{{ r.pill }}">{{ r.model }} <span style="opacity:.6;">· {{ r.provider }}</span></button>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- cloud providers -->
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:13px;">
+            <span style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text,#1b1a17);">Cloud providers</span>
+            <div style="flex:1;height:1px;background:var(--border,#e6e2d9);"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:13px;margin-bottom:30px;">
+            <sc-for list="{{ providersCloud }}" as="p" hint-placeholder-count="4">
+              <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:15px 16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;align-items:flex-start;gap:11px;">
+                  <div style="width:36px;height:36px;border-radius:9px;background:var(--inset,#f0ede7);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--text-2,#5f5c54);flex:none;">{{ p.mark }}</div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:14px;font-weight:600;color:var(--text,#1b1a17);">{{ p.name }}</div>
+                    <div style="margin-top:4px;"><span style="{{ p.kindChip }}">{{ p.kindLabel }}</span></div>
+                  </div>
+                  <span style="{{ p.statusStyle }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ p.dotColor }};display:inline-block;"></span>{{ p.statusLabel }}</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                  <sc-for list="{{ p.models }}" as="mdl" hint-placeholder-count="2">
+                    <span style="font-size:10.5px;font-weight:500;font-family:'IBM Plex Mono',monospace;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);padding:3px 8px;border-radius:5px;">{{ mdl }}</span>
+                  </sc-for>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                  <span style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ p.keyLabel }}</span>
+                  <div style="display:flex;gap:7px;flex:none;">
+                    <sc-if value="{{ p.showTest }}" hint-placeholder-val="{{ false }}"><button onClick="{{ p.onTest }}" style="{{ p.testStyle }}">Test</button></sc-if>
+                    <button onClick="{{ p.onAction }}" style="{{ p.actionStyle }}">{{ p.actionLabel }}</button>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- local models -->
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:13px;">
+            <span style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text,#1b1a17);">Local models</span>
+            <span style="font-size:10px;font-weight:500;color:var(--green,#1f8a5b);background:var(--green-soft,#e6f4ec);padding:2px 7px;border-radius:5px;font-family:'IBM Plex Mono',monospace;">private · on-device</span>
+            <div style="flex:1;height:1px;background:var(--border,#e6e2d9);"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:13px;">
+            <sc-for list="{{ providersLocal }}" as="p" hint-placeholder-count="2">
+              <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:15px 16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;align-items:flex-start;gap:11px;">
+                  <div style="width:36px;height:36px;border-radius:9px;background:var(--inset,#f0ede7);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--text-2,#5f5c54);flex:none;">{{ p.mark }}</div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:14px;font-weight:600;color:var(--text,#1b1a17);">{{ p.name }}</div>
+                    <div style="margin-top:4px;"><span style="{{ p.kindChip }}">{{ p.kindLabel }}</span></div>
+                  </div>
+                  <span style="{{ p.statusStyle }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ p.dotColor }};display:inline-block;"></span>{{ p.statusLabel }}</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                  <sc-for list="{{ p.models }}" as="mdl" hint-placeholder-count="2">
+                    <span style="font-size:10.5px;font-weight:500;font-family:'IBM Plex Mono',monospace;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);padding:3px 8px;border-radius:5px;">{{ mdl }}</span>
+                  </sc-for>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                  <span style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ p.keyLabel }}</span>
+                  <div style="display:flex;gap:7px;flex:none;">
+                    <sc-if value="{{ p.showTest }}" hint-placeholder-val="{{ false }}"><button onClick="{{ p.onTest }}" style="{{ p.testStyle }}">Test</button></sc-if>
+                    <button onClick="{{ p.onAction }}" style="{{ p.actionStyle }}">{{ p.actionLabel }}</button>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
       <!-- ============ KNOWLEDGE ============ -->
       <sc-if value="{{ isKnow }}" hint-placeholder-val="{{ false }}">
       <div style="flex:1;overflow-y:auto;padding:30px 36px 60px;">
@@ -635,7 +960,7 @@
           <p style="font-size:13.5px;color:var(--text-2,#5f5c54);margin:0 0 24px;">Everything is user-supplied via config / env. No secrets, endpoints or company assumptions are hard-coded.</p>
 
           <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:20px;margin-bottom:14px;box-shadow:var(--shadow);">
-            <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:15px;">LLM gateway</div>
+            <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:15px;">General</div>
             <sc-for list="{{ llmFields }}" as="f" hint-placeholder-count="4">
               <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-top:1px solid var(--border,#e6e2d9);">
                 <span style="font-size:12.5px;color:var(--text-2,#5f5c54);">{{ f.label }}</span>
@@ -668,6 +993,104 @@
     </main>
   </div>
 
+  <!-- TICKET DRAWER -->
+  <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ td.onClose }}" style="position:fixed;inset:0;z-index:40;background:rgba(20,18,12,.35);animation:argusFade .2s ease;"></div>
+  <div style="position:fixed;top:0;right:0;bottom:0;width:460px;max-width:92vw;z-index:41;background:var(--surface,#fff);border-left:1px solid var(--border,#e6e2d9);box-shadow:-12px 0 40px -16px rgba(0,0,0,.4);display:flex;flex-direction:column;animation:argusFade .25s ease;">
+    <div style="flex:none;padding:18px 22px;border-bottom:1px solid var(--border,#e6e2d9);">
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap;">
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:var(--text-2,#5f5c54);"><span style="width:8px;height:8px;border-radius:3px;background:{{ td.envColor }};"></span>{{ td.env }}</span>
+            <span style="font-size:10px;font-weight:500;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);padding:2px 7px;border-radius:5px;">{{ td.source }}</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--text-2,#5f5c54);"><span style="width:6px;height:6px;border-radius:50%;background:{{ td.prioColor }};"></span>{{ td.priority }}</span>
+          </div>
+          <h2 style="font-size:17px;font-weight:600;color:var(--text,#1b1a17);margin:0;line-height:1.3;">{{ td.title }}</h2>
+        </div>
+        <button onClick="{{ td.onClose }}" style="width:30px;height:30px;flex:none;border:none;cursor:pointer;border-radius:8px;background:var(--inset,#f0ede7);color:var(--text-2,#5f5c54);display:flex;align-items:center;justify-content:center;font-family:inherit;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3l8 8M11 3l-8 8"/></svg>
+        </button>
+      </div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:20px 22px;">
+      <!-- source -->
+      <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3,#928e84);margin-bottom:7px;">Source · {{ td.intent }}</div>
+      <div style="background:var(--bg,#f4f2ee);border:1px solid var(--border,#e6e2d9);border-radius:10px;padding:13px 15px;margin-bottom:20px;">
+        <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);margin-bottom:5px;">{{ td.from }}</div>
+        <div style="font-size:13.5px;line-height:1.55;color:var(--text,#1b1a17);">{{ td.text }}</div>
+      </div>
+
+      <!-- suggestion -->
+      <sc-if value="{{ td.showSuggest }}" hint-placeholder-val="{{ false }}">
+        <div style="background:var(--accent-soft,#eaf1fc);border:1px solid var(--accent,#2A6FDB);border-radius:12px;padding:15px;margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;">
+            <svg width="14" height="14" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8.2" stroke="var(--accent,#2A6FDB)" stroke-width="1.8"/><circle cx="11" cy="11" r="3" fill="var(--accent,#2A6FDB)"/></svg>
+            <span style="font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--accent,#2A6FDB);">Argus suggests an owner</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:11px;margin-bottom:10px;">
+            <div style="{{ td.suggestAvatar }}">{{ td.suggestInitials }}</div>
+            <div style="flex:1;"><div style="font-size:14px;font-weight:600;color:var(--text,#1b1a17);">{{ td.suggestName }}</div><div style="font-size:11.5px;color:var(--text-2,#5f5c54);">{{ td.suggestRole }}</div></div>
+          </div>
+          <div style="font-size:12.5px;line-height:1.55;color:var(--text,#1b1a17);background:var(--surface,#fff);border-radius:8px;padding:10px 12px;margin-bottom:12px;"><strong style="color:var(--accent,#2A6FDB);">Why:</strong> {{ td.reason }}</div>
+          <div style="display:flex;gap:9px;">
+            <button onClick="{{ td.onAccept }}" style="border:none;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:8px;background:var(--accent,#2A6FDB);color:#fff;">Assign to {{ td.suggestName }}</button>
+            <button onClick="{{ td.onPickStart }}" style="border:1px solid var(--border,#e6e2d9);cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:8px;background:var(--surface,#fff);color:var(--text,#1b1a17);">Choose someone else</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- assignee -->
+      <sc-if value="{{ td.hasAssignee }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3,#928e84);margin-bottom:7px;">Assigned to</div>
+        <div style="display:flex;align-items:center;gap:11px;background:var(--bg,#f4f2ee);border:1px solid var(--border,#e6e2d9);border-radius:10px;padding:11px 13px;margin-bottom:20px;">
+          <div style="{{ td.assignee.avatarStyle }}">{{ td.assignee.initials }}</div>
+          <div style="flex:1;"><div style="font-size:13.5px;font-weight:600;color:var(--text,#1b1a17);">{{ td.assignee.name }}</div><div style="font-size:11.5px;color:var(--text-2,#5f5c54);">{{ td.assignee.role }}</div></div>
+          <button onClick="{{ td.onPickStart }}" style="border:1px solid var(--border,#e6e2d9);cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:7px;background:var(--surface,#fff);color:var(--text,#1b1a17);">Reassign</button>
+        </div>
+      </sc-if>
+
+      <!-- member picker -->
+      <sc-if value="{{ td.picking }}" hint-placeholder-val="{{ false }}">
+        <div style="border:1px solid var(--accent,#2A6FDB);border-radius:12px;padding:13px;margin-bottom:20px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;"><span style="font-size:12px;font-weight:600;color:var(--text,#1b1a17);">Pick a team member</span><button onClick="{{ td.onPickCancel }}" style="border:none;background:transparent;cursor:pointer;font-family:inherit;font-size:11.5px;color:var(--text-3,#928e84);">Cancel</button></div>
+          <div style="display:flex;flex-direction:column;gap:7px;">
+            <sc-for list="{{ td.pickList }}" as="mm" hint-placeholder-count="2">
+              <button onClick="{{ mm.onPick }}" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px solid var(--border,#e6e2d9);background:var(--surface,#fff);cursor:pointer;font-family:inherit;border-radius:9px;padding:9px 11px;">
+                <div style="{{ mm.avatarStyle }}">{{ mm.initials }}</div>
+                <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);">{{ mm.name }}</div><div style="font-size:11px;color:var(--text-2,#5f5c54);">{{ mm.role }} · {{ mm.open }}</div></div>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- actions -->
+      <sc-if value="{{ td.hasActions }}" hint-placeholder-val="{{ true }}">
+        <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3,#928e84);margin-bottom:9px;">Actions · documented for the LLM</div>
+        <div style="display:flex;flex-direction:column;gap:9px;">
+          <sc-for list="{{ td.actions }}" as="ac" hint-placeholder-count="3">
+            <div style="border:1px solid var(--border,#e6e2d9);border-radius:10px;padding:12px 13px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <span style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);flex:1;">{{ ac.name }}</span>
+                <span style="{{ ac.runnerChip }}">{{ ac.runnerLabel }}</span>
+              </div>
+              <div style="font-size:12px;line-height:1.5;color:var(--text-2,#5f5c54);margin-bottom:11px;">{{ ac.desc }}</div>
+              <button onClick="{{ ac.onRun }}" style="{{ ac.btnStyle }}">{{ ac.btnLabel }}</button>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+    <div style="flex:none;padding:14px 22px;border-top:1px solid var(--border,#e6e2d9);display:flex;gap:8px;">
+      <sc-for list="{{ td.statusBtns }}" as="b" hint-placeholder-count="3">
+        <button onClick="{{ b.onClick }}" style="{{ b.style }}">{{ b.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  </sc-if>
+
   <!-- TOAST -->
   <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
     <div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:50;animation:argusToast .3s ease;background:var(--text,#1b1a17);color:var(--bg,#f4f2ee);padding:11px 18px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 12px 40px -12px rgba(0,0,0,.5);display:flex;align-items:center;gap:9px;">
@@ -688,6 +1111,50 @@ class Component extends DCLogic {
     editing: false,
     editText: '',
     chat: [], chatInput: '', chatTyping: false,
+    connected: { openai: true, groq: true, gemini: true, ollama: true, anthropic: false, mistral: false, openrouter: false, vllm: false },
+    authed: false, env: 'all', envOpen: false,
+    openTicket: null, picking: false, actionDone: {},
+    addingMember: false, nm: { name: '', role: '', skills: '', env: 'rh' },
+    qaQ: '', qaA: '',
+    taught: [
+      { kind: 'file', label: 'shipping-policy.pdf', detail: '12 facts extracted', time: '3d ago' },
+      { kind: 'qa', label: 'What is your return window?', detail: '30 days for unworn items, full refund with a prepaid label.', time: '12d ago' },
+    ],
+    members: [
+      { id: 'nour', name: 'Nour Khaled', initials: 'NK', role: 'Marketing Lead', env: 'marketing', skills: ['Content', 'Social', 'Campaigns'], status: 'online', open: 3 },
+      { id: 'omar', name: 'Omar Saidi', initials: 'OS', role: 'Community Manager', env: 'marketing', skills: ['Social replies', 'Darija', 'Scheduling'], status: 'online', open: 5 },
+      { id: 'karim', name: 'Karim Naceur', initials: 'KN', role: 'Sales Lead', env: 'sales', skills: ['Deals', 'Partnerships', 'Demos'], status: 'away', open: 2 },
+      { id: 'lina', name: 'Lina Trabelsi', initials: 'LT', role: 'Account Executive', env: 'sales', skills: ['Pre-sales', 'Quotes', 'Follow-up'], status: 'online', open: 4 },
+      { id: 'salma', name: 'Salma Bouaziz', initials: 'SB', role: 'HR Lead', env: 'rh', skills: ['Hiring', 'Contracts', 'Onboarding'], status: 'online', open: 2 },
+      { id: 'youssef', name: 'Youssef Hamdi', initials: 'YH', role: 'Recruiter', env: 'rh', skills: ['CV screening', 'Interviews', 'Sourcing'], status: 'online', open: 1 },
+    ],
+    tickets: [
+      { id: 't1', env: 'rh', title: 'CV received — Frontend Engineer', source: 'email', from: 'mariem.gharbi@gmail.com', text: 'Application from Mariem Gharbi with an attached CV (PDF) for the Frontend Engineer opening.', intent: 'Job application', priority: 'High', status: 'triage', assignee: null, suggested: 'youssef', reason: 'Youssef owns CV screening & interviews, matches the “screening” skill, and has the lightest recruiter load (1 open).', actions: [
+        { name: 'Parse & summarize CV', runner: 'agent', desc: 'Extract experience, skills and education from the attached PDF and summarize against the Frontend Engineer spec in the knowledge core.' },
+        { name: 'Score fit against role', runner: 'agent', desc: 'Rate the candidate 0–100 using the role requirements; flag any missing must-haves.' },
+        { name: 'Draft acknowledgement reply', runner: 'agent', desc: 'Compose a warm receipt email to the candidate — held for human approval before sending.' },
+        { name: 'Schedule screening call', runner: 'human', desc: 'Book a 30-minute intro call and add it to the hiring calendar.' },
+      ] },
+      { id: 't2', env: 'rh', title: 'Leave request — 3 days', source: 'email', from: 'omar@yourstore', text: 'Omar requests 3 days of annual leave next month.', intent: 'Time off', priority: 'Low', status: 'assigned', assignee: 'salma', suggested: 'salma', reason: '', actions: [
+        { name: 'Check leave balance', runner: 'agent', desc: 'Look up remaining annual leave from the HR records.' },
+        { name: 'Approve / decline', runner: 'human', desc: 'HR lead decision and calendar update.' },
+      ] },
+      { id: 't3', env: 'sales', title: 'Bulk quote — 120 units', source: 'facebook', from: 'Wholesale buyer', text: 'Customer asking for pricing on 120 units of the Atlas Jacket.', intent: 'Quote', priority: 'High', status: 'progress', assignee: 'lina', suggested: 'lina', reason: '', actions: [
+        { name: 'Check stock & lead time', runner: 'agent', desc: 'Query orders_db for available quantity and restock ETA.' },
+        { name: 'Draft tiered quote', runner: 'agent', desc: 'Generate volume pricing from the wholesale price list.' },
+        { name: 'Call the customer', runner: 'human', desc: 'Confirm terms and close the deal.' },
+      ] },
+      { id: 't4', env: 'sales', title: 'Partnership inquiry — Priya N.', source: 'webhook', from: 'Priya Nair', text: 'Inbound partnership interest received from X.', intent: 'Partnership', priority: 'Med', status: 'waiting', assignee: 'karim', suggested: 'karim', reason: '', actions: [
+        { name: 'Qualify the lead', runner: 'agent', desc: 'Summarize the company and fit from public info already ingested.' },
+        { name: 'Book intro call', runner: 'human', desc: 'Sales lead to schedule.' },
+      ] },
+      { id: 't5', env: 'marketing', title: 'Negative comment needs a reply', source: 'instagram', from: '@user_dz', text: 'Public complaint in Darija about a late delivery.', intent: 'Reputation', priority: 'Med', status: 'triage', assignee: null, suggested: 'omar', reason: 'Omar handles social replies and is the team’s Darija speaker; the comment is in Derja and time-sensitive.', actions: [
+        { name: 'Draft empathetic reply (Darija)', runner: 'agent', desc: 'Grounded, on-brand Derja response acknowledging the delay — held for approval.' },
+        { name: 'Pull order status', runner: 'agent', desc: 'Look up the order to give an accurate ETA.' },
+        { name: 'Escalate to lead', runner: 'human', desc: 'If the customer stays unhappy, hand to the marketing lead.' },
+      ] },
+      { id: 't6', env: 'marketing', title: 'Weekly content scheduled', source: 'internal', from: 'Argus', text: 'Next week’s posts drafted and queued for review.', intent: 'Campaign', priority: 'Low', status: 'done', assignee: 'nour', suggested: 'nour', reason: '', actions: [] },
+    ],
     decisions: {},
     hoverSrc: null,
     toast: null,
@@ -737,6 +1204,60 @@ class Component extends DCLogic {
       const r = this.buildReply(q);
       this.setState({ chat: [...this.state.chat, { role: 'argus', text: r.text, factIds: r.factIds, conf: r.conf, gap: r.gap || null, asked: false }], chatTyping: false });
     }, 800);
+  }
+
+  testConn(name, ms) { this.flash('Pinging ' + name + ' … connected · ' + ms + ' ms'); }
+  toggleProvider(id, name) {
+    const c = { ...this.state.connected, [id]: !this.state.connected[id] };
+    this.setState({ connected: c });
+    this.flash((c[id] ? 'Connected to ' : 'Disconnected ') + name);
+  }
+
+  signIn() { this.setState({ authed: true }); this.flash('Signed in to Argus'); }
+  signOut() { this.setState({ authed: false, envOpen: false, openTicket: null }); }
+  setEnv(id) { this.setState({ env: id, envOpen: false, openTicket: null }); }
+  toggleEnvMenu() { this.setState({ envOpen: !this.state.envOpen }); }
+  openTicketFn(id) { this.setState({ openTicket: id, picking: false }); }
+  closeTicket() { this.setState({ openTicket: null, picking: false }); }
+  memberById(id) { return this.state.members.find(m => m.id === id); }
+  ticketTitle(tid) { const t = this.state.tickets.find(x => x.id === tid); return t ? t.title : ''; }
+  assign(tid, mid) {
+    const tickets = this.state.tickets.map(t => t.id === tid ? { ...t, assignee: mid, status: t.status === 'triage' ? 'assigned' : t.status, handled: 'member' } : t);
+    const mem = this.memberById(mid);
+    this.setState({ tickets, picking: false, audit: [{ time: 'just now', actor: 'Lamjed', action: 'asked', detail: 'Assigned “' + this.ticketTitle(tid) + '” to ' + (mem ? mem.name : ''), model: '—' }, ...this.state.audit] });
+    this.flash('Assigned to ' + (mem ? mem.name : ''));
+  }
+  acceptSuggestion(tid) { const t = this.state.tickets.find(x => x.id === tid); if (t && t.suggested) this.assign(tid, t.suggested); }
+  startPicking() { this.setState({ picking: true }); }
+  cancelPicking() { this.setState({ picking: false }); }
+  moveTicket(tid, status, label) { const tickets = this.state.tickets.map(t => t.id === tid ? { ...t, status } : t); this.setState({ tickets }); this.flash('Moved to ' + label); }
+  runAction(tid, idx, action) {
+    if (action.runner === 'agent') {
+      this.setState({ actionDone: { ...this.state.actionDone, [tid + ':' + idx]: true }, audit: [{ time: 'just now', actor: 'Agent', action: 'drafted', detail: action.name + ' · ' + this.ticketTitle(tid), model: 'gpt-4o-mini' }, ...this.state.audit] });
+      this.flash('Agent ran: ' + action.name);
+    } else { this.setState({ picking: true }); this.flash('Pick a person for: ' + action.name); }
+  }
+  toggleAddMember() { this.setState({ addingMember: !this.state.addingMember, nm: { name: '', role: '', skills: '', env: this.state.env === 'all' ? 'rh' : this.state.env } }); }
+  setNm(patch) { this.setState({ nm: { ...this.state.nm, ...patch } }); }
+  saveMember() {
+    const nm = this.state.nm; if (!nm.name.trim()) { this.flash('Enter a name first'); return; }
+    const initials = nm.name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    const mem = { id: 'm' + Date.now(), name: nm.name.trim(), initials, role: nm.role.trim() || 'Team member', env: nm.env, skills: nm.skills ? nm.skills.split(',').map(x => x.trim()).filter(Boolean) : [], status: 'online', open: 0 };
+    this.setState({ members: [...this.state.members, mem], addingMember: false });
+    this.flash('Added ' + mem.name);
+  }
+  onFiles(e) {
+    const files = [...(e.target.files || [])]; if (!files.length) return;
+    const add = files.map(f => ({ kind: 'file', label: f.name, detail: (4 + (f.name.length % 14)) + ' facts extracted', time: 'just now' }));
+    this.setState({ taught: [...add, ...this.state.taught], audit: [{ time: 'just now', actor: 'Lamjed', action: 'answered', detail: 'Taught Argus from ' + files.length + ' file' + (files.length > 1 ? 's' : ''), model: 'embeddings' }, ...this.state.audit] });
+    this.flash('Learned from ' + files.length + ' file' + (files.length > 1 ? 's' : '') + ' → knowledge core');
+    e.target.value = '';
+  }
+  teachQA() {
+    const q = (this.state.qaQ || '').trim(), a = (this.state.qaA || '').trim();
+    if (!q || !a) { this.flash('Add a question and an answer'); return; }
+    this.setState({ taught: [{ kind: 'qa', label: q, detail: a, time: 'just now' }, ...this.state.taught], qaQ: '', qaA: '', audit: [{ time: 'just now', actor: 'Lamjed', action: 'answered', detail: 'Taught Argus: ' + q, model: '—' }, ...this.state.audit] });
+    this.flash('Argus learned a new answer');
   }
 
   askFromChat(i) {
@@ -873,9 +1394,11 @@ class Component extends DCLogic {
     // nav
     const navItem = (id) => {
       const on = s.nav === id;
-      return `display:flex;align-items:center;gap:10px;width:100%;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:${on ? 600 : 500};padding:8px 10px;border-radius:8px;margin-bottom:2px;transition:all .12s;background:${on ? 'var(--accent-soft,#eaf1fc)' : 'transparent'};color:${on ? 'var(--accent,#2A6FDB)' : 'var(--text-2,#5f5c54)'};`;
+      return `display:flex;align-items:center;gap:10px;width:100%;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:${on ? 600 : 500};padding:8px 10px;border-radius:8px;margin-bottom:2px;transition:color .12s;background:${on ? 'var(--accent-soft,#eaf1fc)' : 'transparent'};color:${on ? 'var(--accent,#2A6FDB)' : 'var(--text-2,#5f5c54)'};`;
     };
-    const ns = { inbox: navItem('inbox'), chat: navItem('chat'), connectors: navItem('connectors'), agents: navItem('agents'), channels: navItem('channels'), know: navItem('know'), gaps: navItem('gaps'), audit: navItem('audit'), settings: navItem('settings') };
+    const ns = { inbox: navItem('inbox'), chat: navItem('chat'), pipelines: navItem('pipelines'), members: navItem('members'), connectors: navItem('connectors'), models: navItem('models'), agents: navItem('agents'), channels: navItem('channels'), know: navItem('know'), teach: navItem('teach'), gaps: navItem('gaps'), audit: navItem('audit'), settings: navItem('settings') };
+    const badgePipelines = "font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace;min-width:18px;text-align:center;padding:1px 5px;border-radius:9px;color:var(--accent,#2A6FDB);background:var(--accent-soft,#eaf1fc);";
+    const badgeModels = "font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace;min-width:18px;text-align:center;padding:1px 5px;border-radius:9px;color:var(--green,#1f8a5b);background:var(--green-soft,#e6f4ec);";
 
     const needsCount = this.MSGS.filter(m => !m.preSent && !s.decisions[m.id]).length;
     const gapsOpen = Object.values(s.gapState).filter(v => v === 'open').length;
@@ -1089,16 +1612,127 @@ class Component extends DCLogic {
       { name: 'Send via channel', desc: 'Deliver an approved reply to an output channel.', state: 'Needs approval', locked: true },
     ].map(t => ({ ...t, chipStyle: connStatusChip('on') }));
 
+    // models (LLM gateway)
+    const ghostBtnS = 'border:none;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:7px;background:var(--inset,#f0ede7);color:var(--text,#1b1a17);';
+    const accentBtnS = 'border:none;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:7px;background:var(--accent,#2A6FDB);color:#fff;';
+    const kindChipCloud = "font-size:9.5px;font-weight:700;letter-spacing:.04em;font-family:'IBM Plex Mono',monospace;color:var(--accent,#2A6FDB);background:var(--accent-soft,#eaf1fc);padding:2px 7px;border-radius:4px;";
+    const kindChipLocal = "font-size:9.5px;font-weight:700;letter-spacing:.04em;font-family:'IBM Plex Mono',monospace;color:var(--green,#1f8a5b);background:var(--green-soft,#e6f4ec);padding:2px 7px;border-radius:4px;";
+    const makeProvider = (p, kind) => {
+      const on = !!s.connected[p.id];
+      return {
+        mark: p.mark, name: p.name, kindLabel: kind === 'local' ? 'Local' : 'Cloud', kindChip: kind === 'local' ? kindChipLocal : kindChipCloud,
+        statusLabel: on ? 'Connected' : 'Available', statusStyle: connStatusChip(on ? 'on' : 'off'), dotColor: on ? 'var(--green,#1f8a5b)' : 'var(--text-3,#928e84)',
+        models: p.models, keyLabel: p.key,
+        showTest: on, onTest: () => this.testConn(p.name, p.ms), testStyle: ghostBtnS,
+        actionLabel: on ? 'Configure' : 'Connect', actionStyle: on ? ghostBtnS : accentBtnS,
+        onAction: on ? () => this.flash('Configuring ' + p.name + ' …') : () => this.toggleProvider(p.id, p.name),
+      };
+    };
+    const providersCloud = [
+      { id: 'openai', mark: 'oa', name: 'OpenAI', models: ['gpt-4o-mini', 'gpt-4o', 'text-embedding-3-small'], key: 'sk-•••••••4f2a', ms: 180 },
+      { id: 'groq', mark: 'gq', name: 'Groq', models: ['llama-3.3-70b', 'mixtral-8x7b'], key: 'gsk_••••••9c1', ms: 42 },
+      { id: 'gemini', mark: 'gm', name: 'Google Gemini', models: ['gemini-1.5-pro', 'gemini-1.5-flash'], key: 'AIza••••••7Q', ms: 210 },
+      { id: 'anthropic', mark: 'an', name: 'Anthropic', models: ['claude-3.5-sonnet', 'claude-3.5-haiku'], key: 'not configured', ms: 160 },
+      { id: 'mistral', mark: 'mi', name: 'Mistral', models: ['mistral-large', 'mistral-small'], key: 'not configured', ms: 140 },
+      { id: 'openrouter', mark: 'or', name: 'OpenRouter', models: ['any model · routed'], key: 'not configured', ms: 200 },
+    ].map(p => makeProvider(p, 'cloud'));
+    const providersLocal = [
+      { id: 'ollama', mark: 'ol', name: 'Ollama', models: ['qwen2.5:14b', 'gemma2:9b'], key: 'http://localhost:11434', ms: 60 },
+      { id: 'vllm', mark: 'vl', name: 'vLLM', models: ['custom GGUF / HF'], key: 'http://localhost:8000', ms: 55 },
+    ].map(p => makeProvider(p, 'local'));
+    const connectedCount = Object.values(s.connected).filter(Boolean).length;
+    const routePill = "border:none;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;color:var(--text,#1b1a17);background:var(--inset,#f0ede7);padding:6px 11px;border-radius:7px;flex:none;white-space:nowrap;";
+    const routing = [
+      { role: 'Classifier', note: 'fast intent + language detection', model: 'gpt-4o-mini', provider: 'OpenAI' },
+      { role: 'Drafter — English', note: 'grounded reply composition', model: 'gpt-4o-mini', provider: 'OpenAI' },
+      { role: 'Drafter — Darija', note: 'private, on-device Derja', model: 'qwen2.5:14b', provider: 'Ollama · local' },
+      { role: 'Embeddings', note: 'knowledge retrieval → pgvector', model: 'text-embedding-3-small', provider: 'OpenAI' },
+      { role: 'Fallback', note: 'used if the primary is unavailable', model: 'llama-3.3-70b', provider: 'Groq' },
+    ].map(r => ({ ...r, pill: routePill, onClick: () => this.flash('Reassign “' + r.role + '” model …') }));
+
+    // ===== environments, members, tickets =====
+    const ENVS = { all: { name: 'All environments', color: 'var(--text-3,#928e84)' }, marketing: { name: 'Marketing', color: '#6b5bd6' }, sales: { name: 'Sales', color: 'var(--green,#1f8a5b)' }, rh: { name: 'RH · People', color: '#c2742e' } };
+    const envColorOf = (id) => (ENVS[id] || ENVS.all).color;
+    const curEnv = ENVS[s.env] || ENVS.all;
+    const envOptions = ['all', 'marketing', 'sales', 'rh'].map(id => ({
+      name: ENVS[id].name, color: envColorOf(id), active: s.env === id, onClick: () => this.setEnv(id),
+      style: 'display:flex;align-items:center;gap:9px;width:100%;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:' + (s.env === id ? 600 : 500) + ';padding:8px 9px;border-radius:7px;background:' + (s.env === id ? 'var(--accent-soft,#eaf1fc)' : 'transparent') + ';color:' + (s.env === id ? 'var(--accent,#2A6FDB)' : 'var(--text,#1b1a17)') + ';',
+    }));
+    const inEnv = (env) => s.env === 'all' || env === s.env;
+    const memberVM = (m) => ({
+      id: m.id, name: m.name, initials: m.initials, role: m.role, skills: m.skills, envName: ENVS[m.env].name, envColor: envColorOf(m.env),
+      status: m.status, statusLabel: m.status === 'online' ? 'Online' : 'Away', statusColor: m.status === 'online' ? 'var(--green,#1f8a5b)' : 'var(--amber,#a9701a)', open: m.open + ' open',
+      avatarStyle: 'width:42px;height:42px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#fff;background:' + envColorOf(m.env) + ';',
+    });
+    const membersFiltered = s.members.filter(m => inEnv(m.env)).map(memberVM);
+
+    const COLS = [['triage', 'Triage'], ['assigned', 'Assigned'], ['progress', 'In progress'], ['waiting', 'Waiting'], ['done', 'Done']];
+    const srcLabel = (src) => ({ email: 'Email', facebook: 'Facebook', instagram: 'Instagram', webhook: 'Webhook', internal: 'Internal' }[src] || src);
+    const prioColorOf = (p) => p === 'High' ? 'var(--red,#bb3a2c)' : p === 'Med' ? 'var(--amber,#a9701a)' : 'var(--text-3,#928e84)';
+    const ticketCardVM = (t) => {
+      const a = t.assignee ? this.memberById(t.assignee) : null;
+      return {
+        id: t.id, title: t.title, source: srcLabel(t.source), intent: t.intent, priority: t.priority, prioColor: prioColorOf(t.priority),
+        envColor: envColorOf(t.env), envName: ENVS[t.env].name,
+        hasAssignee: !!a, assigneeName: a ? a.name : '', assigneeInitials: a ? a.initials : '', assigneeStyle: a ? 'width:22px;height:22px;border-radius:6px;flex:none;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:600;color:#fff;background:' + envColorOf(a.env) + ';' : '',
+        suggested: !!(t.suggested && !a), onClick: () => this.openTicketFn(t.id),
+        cardStyle: 'display:block;width:100%;text-align:left;border:1px solid var(--border,#e6e2d9);background:var(--surface,#fff);cursor:pointer;font-family:inherit;border-radius:10px;padding:12px;margin-bottom:8px;box-shadow:var(--shadow);',
+      };
+    };
+    const kanbanCols = COLS.map(([key, label]) => {
+      const ts = s.tickets.filter(t => inEnv(t.env) && t.status === key);
+      return { key, label, count: ts.length, tickets: ts.map(ticketCardVM), empty: ts.length === 0 };
+    });
+    const openTicketsCount = s.tickets.filter(t => inEnv(t.env) && t.status !== 'done').length;
+
+    // ticket drawer
+    let drawerOpen = false, td = {};
+    const tObj = s.tickets.find(t => t.id === s.openTicket);
+    if (tObj) {
+      drawerOpen = true;
+      const a = tObj.assignee ? this.memberById(tObj.assignee) : null;
+      const sug = tObj.suggested ? this.memberById(tObj.suggested) : null;
+      const actions = (tObj.actions || []).map((ac, idx) => {
+        const done = !!s.actionDone[tObj.id + ':' + idx];
+        return {
+          name: ac.name, desc: ac.desc, runnerLabel: ac.runner === 'agent' ? 'Agent can run' : 'Needs a person',
+          runnerChip: "display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;letter-spacing:.03em;font-family:'IBM Plex Mono',monospace;padding:2px 7px;border-radius:5px;" + (ac.runner === 'agent' ? 'color:var(--accent,#2A6FDB);background:var(--accent-soft,#eaf1fc);' : 'color:var(--amber,#a9701a);background:var(--amber-soft,#f6ecda);'),
+          done, btnLabel: done ? '✓ Done' : (ac.runner === 'agent' ? 'Run with agent' : 'Assign a person'),
+          btnStyle: 'border:none;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:7px;flex:none;' + (done ? 'background:var(--green-soft,#e6f4ec);color:var(--green,#1f8a5b);' : (ac.runner === 'agent' ? 'background:var(--accent,#2A6FDB);color:#fff;' : 'background:var(--inset,#f0ede7);color:var(--text,#1b1a17);')),
+          onRun: () => this.runAction(tObj.id, idx, ac),
+        };
+      });
+      const pickList = s.members.filter(m => m.env === tObj.env).map(m => ({ ...memberVM(m), onPick: () => this.assign(tObj.id, m.id) }));
+      td = {
+        title: tObj.title, env: ENVS[tObj.env].name, envColor: envColorOf(tObj.env), source: srcLabel(tObj.source), from: tObj.from || '', text: tObj.text, intent: tObj.intent, priority: tObj.priority, prioColor: prioColorOf(tObj.priority),
+        hasAssignee: !!a, assignee: a ? memberVM(a) : {},
+        showSuggest: !!(sug && !a), suggestName: sug ? sug.name : '', suggestRole: sug ? sug.role : '', suggestInitials: sug ? sug.initials : '', suggestAvatar: sug ? 'width:34px;height:34px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:#fff;background:' + envColorOf(sug.env) + ';' : '', reason: tObj.reason || '',
+        onAccept: () => this.acceptSuggestion(tObj.id), actions, hasActions: actions.length > 0,
+        picking: s.picking, pickList, onPickStart: () => this.startPicking(), onPickCancel: () => this.cancelPicking(), onClose: () => this.closeTicket(),
+        statusBtns: [{ label: 'Start', to: 'progress' }, { label: 'Waiting', to: 'waiting' }, { label: 'Resolve', to: 'done' }].map(b => ({ label: b.label, onClick: () => this.moveTicket(tObj.id, b.to, b.label), style: 'flex:1;border:1px solid var(--border,#e6e2d9);background:var(--surface,#fff);cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;color:var(--text,#1b1a17);padding:7px 0;border-radius:8px;' })),
+      };
+    }
+
+    // add-member form
+    const nm = s.nm;
+    const nmEnvOptions = ['marketing', 'sales', 'rh'].map(id => ({
+      name: ENVS[id].name, onClick: () => this.setNm({ env: id }),
+      style: 'border:1px solid ' + (nm.env === id ? 'var(--accent,#2A6FDB)' : 'var(--border,#e6e2d9)') + ';cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;padding:7px 13px;border-radius:8px;background:' + (nm.env === id ? 'var(--accent-soft,#eaf1fc)' : 'var(--surface,#fff)') + ';color:' + (nm.env === id ? 'var(--accent,#2A6FDB)' : 'var(--text-2,#5f5c54)') + ';',
+    }));
+
+    // teach
+    const taught = s.taught.map(t => { const tc = this.typeChip(t.kind === 'qa' ? 'qa' : 'file'); return { kindChip: tc.style, kindLabel: tc.label, label: t.label, detail: t.detail, time: t.time }; });
+
     // audit
     const audit = s.audit.map(a => ({ ...a, chip: this.actionChip(a.action) }));
 
     // settings
     const llmFields = [
-      { label: 'Gateway', value: 'LiteLLM' },
-      { label: 'Primary model', value: 'gpt-4o-mini' },
-      { label: 'Local model (Darija)', value: 'qwen2.5:14b · Ollama' },
-      { label: 'Embeddings', value: 'text-embedding-3-small → pgvector' },
+      { label: 'Tenant', value: 'local (single)' },
       { label: 'Confidence threshold', value: '0.60' },
+      { label: 'Data residency', value: 'this machine · self-hosted' },
+      { label: 'Audit log', value: 'append-only · immutable' },
+      { label: 'LLM providers', value: 'configured in Models →' },
     ];
     const channels = [
       { name: 'Facebook Messenger', kind: 'inbound', detail: 'Page @yourstore · webhook verified', status: 'Connected' },
@@ -1116,10 +1750,17 @@ class Component extends DCLogic {
 
     return {
       rootStyle, lightBtn, darkBtn, setLight: () => this.toggleTheme('light'), setDark: () => this.toggleTheme('dark'),
-      ns, navInbox: () => this.setNav('inbox'), navChat: () => this.setNav('chat'), navConnectors: () => this.setNav('connectors'), navAgents: () => this.setNav('agents'), navChannels: () => this.setNav('channels'), navKnow: () => this.setNav('know'), navGaps: () => this.setNav('gaps'), navAudit: () => this.setNav('audit'), navSettings: () => this.setNav('settings'),
-      needsCount, gapsOpen, badgeNeeds, badgeGaps,
-      isInbox: s.nav === 'inbox', isChat: s.nav === 'chat', isConnectors: s.nav === 'connectors', isAgents: s.nav === 'agents', isChannels: s.nav === 'channels', isKnow: s.nav === 'know', isGaps: s.nav === 'gaps', isAudit: s.nav === 'audit', isSettings: s.nav === 'settings',
-      connKnowledge, connInbound, chanReply, chanApproval, pipeline, agents, tools,
+      ns, navInbox: () => this.setNav('inbox'), navChat: () => this.setNav('chat'), navPipelines: () => this.setNav('pipelines'), navMembers: () => this.setNav('members'), navConnectors: () => this.setNav('connectors'), navModels: () => this.setNav('models'), navAgents: () => this.setNav('agents'), navChannels: () => this.setNav('channels'), navKnow: () => this.setNav('know'), navTeach: () => this.setNav('teach'), navGaps: () => this.setNav('gaps'), navAudit: () => this.setNav('audit'), navSettings: () => this.setNav('settings'),
+      needsCount, gapsOpen, badgeNeeds, badgeGaps, badgeModels, connectedCount, badgePipelines, openTicketsCount,
+      isInbox: s.nav === 'inbox', isChat: s.nav === 'chat', isPipelines: s.nav === 'pipelines', isMembers: s.nav === 'members', isConnectors: s.nav === 'connectors', isModels: s.nav === 'models', isAgents: s.nav === 'agents', isChannels: s.nav === 'channels', isKnow: s.nav === 'know', isTeach: s.nav === 'teach', isGaps: s.nav === 'gaps', isAudit: s.nav === 'audit', isSettings: s.nav === 'settings',
+      taught, qaQ: s.qaQ, qaA: s.qaA, onQaQ: (e) => this.setState({ qaQ: e.target.value }), onQaA: (e) => this.setState({ qaA: e.target.value }), onFiles: (e) => this.onFiles(e), teachQA: () => this.teachQA(),
+      connKnowledge, connInbound, chanReply, chanApproval, pipeline, agents, tools, providersCloud, providersLocal, routing,
+      notAuthed: !s.authed, authed: s.authed, signIn: () => this.signIn(), signOut: () => this.signOut(),
+      envOpen: s.envOpen, toggleEnvMenu: () => this.toggleEnvMenu(), envName: curEnv.name, envColor: curEnv.color, envOptions,
+      membersFiltered, membersCount: membersFiltered.length, kanbanCols, drawerOpen, td,
+      addingMember: s.addingMember, toggleAddMember: () => this.toggleAddMember(), nmName: nm.name, nmRole: nm.role, nmSkills: nm.skills,
+      onNmName: (e) => this.setNm({ name: e.target.value }), onNmRole: (e) => this.setNm({ role: e.target.value }), onNmSkills: (e) => this.setNm({ skills: e.target.value }),
+      nmEnvOptions, saveMember: () => this.saveMember(),
       chat, chatEmpty: s.chat.length === 0, chatTyping: s.chatTyping, chatInput: s.chatInput, chatDir: isAr(s.chatInput) ? 'rtl' : 'ltr',
       onChatInput: (e) => this.setState({ chatInput: e.target.value }), onChatKey: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.send(); } },
       sendChat: () => this.send(), sendBtn, suggestions, chatModel: 'LiteLLM → gpt-4o-mini / qwen2.5',
