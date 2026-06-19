@@ -38,6 +38,7 @@ from engine import ingest as ke_ingest
 from engine import keys as ke_keys
 from engine import chat as ke_chat
 from engine import secret as ke_secret
+from engine import projects as ke_projects
 
 
 # --- Safe filename for uploads (prevents path traversal) -------------------
@@ -400,16 +401,30 @@ finding in TND, and shows you a ranked report. You never write SQL or prompts.</
 #  WORKING KNOWLEDGE-ENGINE PAGES  (separate from the Claude design preview)
 # ============================================================================
 
-def _ke_chrome(active: str, body: str) -> str:
+def _ke_chrome(active: str, body: str, tenant: str = "default") -> str:
+    # Build per-tenant URLs so nav stays within the active business.
+    base = "" if tenant == "default" else f"/p/{tenant}"
     nav_items = [
-        ("teach",      "/teach",      "Teach"),
-        ("models",     "/models",     "Models"),
-        ("api",        "/api",        "Developer API"),
-        ("playground", "/playground", "Playground"),
+        ("teach",      f"{base}/teach",      "Teach"),
+        ("models",     f"{base}/models",     "Models"),
+        ("api",        f"{base}/api",        "Developer API"),
+        ("playground", f"{base}/playground", "Playground"),
     ]
     nav = " · ".join(
         f'<a href="{href}" style="color:{"#3b82f6" if active==key else "#94a3b8"};text-decoration:none;font-weight:{600 if active==key else 500};">{label}</a>'
         for key, href, label in nav_items)
+
+    # Tiny project switcher in the chrome (right side).
+    projects = ke_projects.list_projects()
+    proj_opts = "".join(
+        f'<option value="{esc(p["slug"])}" {"selected" if p["slug"]==tenant else ""}>'
+        f'{esc(p["name"])} ({esc(p["slug"])})</option>' for p in projects)
+    switcher = f"""
+<form method=post action="/projects/switch" style="display:flex;align-items:center;gap:6px;margin:0">
+  <span style="font-size:11px;color:#8b97a7">project</span>
+  <select name=slug onchange="this.form.submit()" style="background:#0a0e15;color:#e6edf3;border:1px solid #2a3647;border-radius:6px;padding:4px 8px;font-size:12px">{proj_opts}</select>
+  <a href="/projects/new" style="font-size:11px;color:#60a5fa;text-decoration:none;margin-left:4px">+ new</a>
+</form>"""
     return f"""<!doctype html><html><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <title>Argus · {active}</title>
@@ -441,7 +456,7 @@ form.inline{{display:inline}} a{{color:#60a5fa;text-decoration:none}}
 <header><span class=brand>🛰️ Argus</span>
 <a href="/" style="color:#94a3b8;text-decoration:none">design preview</a>
 <span style="color:#3a4452">·</span>{nav}
-<span style="margin-left:auto" class=muted>knowledge layer · /v1 API</span></header>
+<div style="margin-left:auto;display:flex;align-items:center;gap:14px">{switcher}</div></header>
 <div class=wrap>{body}</div></body></html>"""
 
 
@@ -453,8 +468,9 @@ def _human_bytes(n):
     return f"{n:.1f} TB"
 
 
-def view_teach():
-    sources = ke_ingest.list_sources("default")
+def view_teach(tenant: str = "default"):
+    base = "" if tenant == "default" else f"/p/{tenant}"
+    sources = ke_ingest.list_sources(tenant)
     rows = ""
     for s in sources:
         kind_pill = '<span class="pill gray">file</span>' if s["kind"] == "file" else \
@@ -464,21 +480,20 @@ def view_teach():
                  f"<td>{int(s.get('chunks',0))}</td>"
                  f"<td>{_human_bytes(s.get('bytes') or 0)}</td>"
                  f"<td>{esc(s['created_at'][:16])}</td>"
-                 f"<td><form class=inline method=post action=/teach/delete onsubmit=\"return confirm('Delete?')\">"
+                 f"<td><form class=inline method=post action=\"{base}/teach/delete\" onsubmit=\"return confirm('Delete?')\">"
                  f"<input type=hidden name=id value={s['id']}><button class=danger>Delete</button></form></td></tr>")
-
-    body = f"""<h1>Teach Argus</h1>
-<p class=muted>Upload files (PDF / MD / TXT / HTML) or add answered Q&A. Each one is chunked, embedded with Gemini text-embedding-004, and indexed in pgvector. Anything you teach is then available to <code>/v1/chat</code>.</p>
+    body = f"""<h1>Teach Argus <span style="font-size:12px;color:#8b97a7">· project {esc(tenant)}</span></h1>
+<p class=muted>Upload files (PDF / MD / TXT / HTML) or add answered Q&A. Each one is chunked, embedded with Gemini, and indexed in pgvector — for this project only.</p>
 
 <div class=card><h2>Upload a file</h2>
-<form method=post action=/teach/upload enctype=multipart/form-data class=row>
+<form method=post action="{base}/teach/upload" enctype=multipart/form-data class=row>
 <input type=file name=file required style="max-width:380px">
 <button>Ingest file</button>
 </form>
 <div class=muted style="margin-top:6px">PDFs require <code>pypdf</code> in the runtime. Otherwise: txt/md/markdown/html.</div></div>
 
 <div class=card><h2>Add an answered Q&A</h2>
-<form method=post action=/teach/qa>
+<form method=post action="{base}/teach/qa">
 <div style="display:grid;gap:8px">
 <input name=question placeholder="Question (what customers ask)" required>
 <textarea name=answer placeholder="The grounded answer (becomes a high-authority fact)" required></textarea>
@@ -489,25 +504,26 @@ def view_teach():
 <table><tr><th>Kind</th><th>Title</th><th>Chunks</th><th>Size</th><th>Added</th><th></th></tr>
 {rows or '<tr><td colspan=6 class=muted style="text-align:center;padding:24px">Nothing yet — upload a file above.</td></tr>'}
 </table></div>"""
-    return _ke_chrome("teach", body)
+    return _ke_chrome("teach", body, tenant)
 
 
-def view_models():
+def view_models(tenant: str = "default"):
+    base = "" if tenant == "default" else f"/p/{tenant}"
     rows = ""
-    for p in ke_providers.list_providers("default"):
+    for p in ke_providers.list_providers(tenant):
         enabled = '<span class="pill" style="background:#064e3b;color:#34d399">enabled</span>' if (p["enabled"] in ("t", True, "true")) else '<span class="pill" style="background:#3a2030;color:#fca5a5">off</span>'
         rows += (f"<tr><td><b>{esc(p['name'])}</b></td><td>{esc(p['default_model'])}</td>"
                  f"<td>{esc(p.get('base_url') or '—')}</td><td>{enabled}</td>"
                  f"<td>{esc(p['created_at'][:16])}</td>"
-                 f"<td><a class=btn href='/v1/providers/test/{p['name']}' target=_blank>Test</a> "
-                 f"<form class=inline method=post action=/models/delete onsubmit=\"return confirm('Delete provider?')\">"
+                 f"<td><span class=muted>(test via API)</span> "
+                 f"<form class=inline method=post action=\"{base}/models/delete\" onsubmit=\"return confirm('Delete provider?')\">"
                  f"<input type=hidden name=id value={p['id']}><button class=danger>Delete</button></form></td></tr>")
 
-    body = f"""<h1>Models</h1>
-<p class=muted>Connect any LLM provider. Argus stores the API key encrypted (AES-GCM via APP_SECRET). Same model goes through Argus on every /v1/chat call — Argus just injects your knowledge.</p>
+    body = f"""<h1>Models <span style="font-size:12px;color:#8b97a7">· project {esc(tenant)}</span></h1>
+<p class=muted>Connect any LLM provider for <b>this project</b>. Argus stores the API key encrypted (AES-GCM via APP_SECRET). Same model goes through Argus on every /v1/chat call — Argus just injects this project's knowledge.</p>
 
 <div class=card><h2>Connect a provider</h2>
-<form method=post action=/models/add>
+<form method=post action="{base}/models/add">
 <div style="display:grid;gap:8px;grid-template-columns:1fr 1fr">
   <label>Name <select name=name>
     <option value=gemini>gemini</option>
@@ -525,12 +541,14 @@ def view_models():
 <table><tr><th>Provider</th><th>Default model</th><th>Base URL</th><th></th><th>Added</th><th></th></tr>
 {rows or '<tr><td colspan=6 class=muted style="text-align:center;padding:24px">No providers yet.</td></tr>'}
 </table></div>"""
-    return _ke_chrome("models", body)
+    return _ke_chrome("models", body, tenant)
 
 
-def view_api(revealed_key: str | None = None):
-    keys = ke_keys.list_keys("default")
-    reqs = ke_chat.list_requests("default", limit=20)
+def view_api(revealed_key: str | None = None, tenant: str = "default"):
+    keys = ke_keys.list_keys(tenant)
+    reqs = ke_chat.list_requests(tenant, limit=20)
+    base = "" if tenant == "default" else f"/p/{tenant}"
+    api_base = f"http://localhost:8090{base}/v1"
 
     krows = ""
     for k in keys:
@@ -542,7 +560,7 @@ def view_api(revealed_key: str | None = None):
                   f"<td>{int(k.get('rate_per_min') or 0)}/min</td>"
                   f"<td>{esc(k['created_at'][:16])}</td>"
                   f"<td>{esc((k.get('last_used_at') or '')[:16] or '—')}</td>"
-                  f"<td><form class=inline method=post action=/api/revoke-key><input type=hidden name=id value={k['id']}><button class=sec>Revoke</button></form></td></tr>")
+                  f"<td><form class=inline method=post action=\"{base}/api/revoke-key\"><input type=hidden name=id value={k['id']}><button class=sec>Revoke</button></form></td></tr>")
 
     reveal_box = ""
     if revealed_key:
@@ -560,13 +578,13 @@ def view_api(revealed_key: str | None = None):
                   f"<td class=r>{int(r.get('chunks_used') or 0)}</td>"
                   f"<td>{esc(r['status'])}</td></tr>")
 
-    body = f"""<h1>Developer API</h1>
-<p class=muted>Use the same models you connected, but through Argus — every call gets your knowledge injected, with citations. <b>OpenAI-compatible</b>: drop into any client by setting <code>baseUrl = http://localhost:8090/v1</code> and using an Argus API key.</p>
+    body = f"""<h1>Developer API <span style="font-size:12px;color:#8b97a7">· project {esc(tenant)}</span></h1>
+<p class=muted>Use the same models you connected, but through Argus — every call gets your knowledge injected, with citations. <b>OpenAI-compatible</b>: drop into any client by setting <code>baseUrl = {esc(api_base)}</code> and using an Argus API key from this project.</p>
 
 {reveal_box}
 
 <div class=card><h2>API keys</h2>
-<form method=post action=/api/create-key class=row style="margin-bottom:10px">
+<form method=post action="{base}/api/create-key" class=row style="margin-bottom:10px">
 <input name=name placeholder="key name (e.g. 'My App Prod')" required style="max-width:280px">
 <button>Create new key</button>
 </form>
@@ -576,7 +594,7 @@ def view_api(revealed_key: str | None = None):
 
 <div class=card><h2>Use the API</h2>
 <h3 style="font-size:13px;margin:10px 0 4px;color:#cdd9e5">curl</h3>
-<pre>curl http://localhost:8090/v1/chat/completions \\
+<pre>curl {esc(api_base)}/chat/completions \\
   -H "Authorization: Bearer $ARGUS_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{{
@@ -585,7 +603,7 @@ def view_api(revealed_key: str | None = None):
   }}'</pre>
 <h3 style="font-size:13px;margin:14px 0 4px;color:#cdd9e5">Python (openai SDK — same call, swapped baseUrl)</h3>
 <pre>from openai import OpenAI
-client = OpenAI(api_key="ak_live_…", base_url="http://localhost:8090/v1")
+client = OpenAI(api_key="ak_live_…", base_url="{esc(api_base)}")
 resp = client.chat.completions.create(
     model="gemini-2.5-flash",
     messages=[{{"role": "user", "content": "What is your refund policy?"}}],
@@ -598,12 +616,13 @@ print(resp.argus_citations)   # which chunks were used</pre>
 <table><tr><th>When</th><th>Model</th><th>Key</th><th class=r>Tokens</th><th class=r>Latency</th><th class=r>Cost</th><th class=r>Chunks</th><th>Status</th></tr>
 {rrows or '<tr><td colspan=8 class=muted style="text-align:center;padding:24px">No requests yet.</td></tr>'}
 </table></div>"""
-    return _ke_chrome("api", body)
+    return _ke_chrome("api", body, tenant)
 
 
 def view_playground(prompt: str = "", model: str = "gemini-2.5-flash",
-                    answer: str | None = None, citations: list | None = None):
-    provs = ke_providers.list_providers("default")
+                    answer: str | None = None, citations: list | None = None,
+                    tenant: str = "default"):
+    provs = ke_providers.list_providers(tenant)
     model_opts = "".join(f'<option value="{esc(p["default_model"])}" {"selected" if p["default_model"]==model else ""}>{esc(p["name"])} → {esc(p["default_model"])}</option>'
                           for p in provs) or '<option value="">(no providers connected — visit /models)</option>'
     cit_html = ""
@@ -616,15 +635,33 @@ def view_playground(prompt: str = "", model: str = "gemini-2.5-flash",
     ans_html = ""
     if answer is not None:
         ans_html = f"<div class=card><h2>Answer</h2><pre style='color:#e6edf3;white-space:pre-wrap'>{esc(answer)}</pre></div>{cit_html}"
-    body = f"""<h1>Playground</h1>
+    base = "" if tenant == "default" else f"/p/{tenant}"
+    body = f"""<h1>Playground <span style="font-size:12px;color:#8b97a7">· project {esc(tenant)}</span></h1>
 <p class=muted>Try Argus end-to-end: pick a connected model, ask a question, see the answer + which chunks grounded it.</p>
-<div class=card><form method=post action=/playground/run>
+<div class=card><form method=post action="{base}/playground/run">
 <label>Model <select name=model>{model_opts}</select></label>
 <div style="margin-top:8px"><label>Question <textarea name=q placeholder="Ask anything about what you've taught Argus.">{esc(prompt)}</textarea></label></div>
 <div style="margin-top:8px"><button>Ask</button></div>
 </form></div>
 {ans_html}"""
-    return _ke_chrome("playground", body)
+    return _ke_chrome("playground", body, tenant)
+
+
+def view_new_project():
+    body = """<h1>+ New business</h1>
+<p class=muted>Each business is a fully isolated workspace: its own connected LLMs, knowledge core, API keys, and per-project URL prefix.</p>
+<div class=card>
+<form method=post action="/projects/create">
+<div style="display:grid;gap:10px;max-width:480px">
+  <label>Business name <input name=name required placeholder="Speedo Delivery"></label>
+  <label>URL slug (optional) <input name=slug placeholder="auto-derived from name"></label>
+  <label>Primary model <input name=primary_model required value="gemini-2.5-flash" placeholder="gemini-2.5-flash / llama-3.3-70b-versatile / gpt-4o-mini"></label>
+</div>
+<div style="margin-top:12px"><button>Create business</button></div>
+</form>
+</div>
+<p class=muted style="margin-top:14px">After creation, your developer-API base URL becomes <code>http://localhost:8090/p/&lt;slug&gt;/v1</code>.</p>"""
+    return _ke_chrome("teach", body, "default")
 
 
 # ============================================================================
@@ -725,6 +762,24 @@ class H(BaseHTTPRequestHandler):
             return None
         return info
 
+    def _tenant_path(self, suffix: str) -> str:
+        """Build a per-tenant URL: /p/<slug>/<suffix> for non-default, /<suffix> otherwise.
+        suffix may or may not start with '/'."""
+        s = suffix if suffix.startswith("/") else "/" + suffix
+        return s if self._tenant == "default" else f"/p/{self._tenant}{s}"
+
+    def _require_tenant_match(self, key_info: dict) -> bool:
+        """When the URL had an explicit /p/<slug>/ prefix, require the API key
+        was minted for that same project. Prevents a confused-deputy attack
+        where a leaked key for tenant A is used against /p/B/v1/...
+        Returns False (and sends 403) on mismatch."""
+        if self._tenant_explicit and key_info["tenant_id"] != self._tenant:
+            self._json({"error": {"message": "API key was minted for a different project — "
+                                              f"key tenant '{key_info['tenant_id']}' ≠ URL tenant '{self._tenant}'",
+                                    "type": "tenant_mismatch"}}, 403)
+            return False
+        return True
+
     def _require_admin(self) -> bool:
         """Admin token for /v1/* management endpoints (provider config,
         key issuance, request log, etc.). Uses hmac.compare_digest."""
@@ -756,6 +811,8 @@ class H(BaseHTTPRequestHandler):
         "/models":                 "_get_models",
         "/api":                    "_get_api",
         "/playground":             "_get_playground",
+        "/projects/new":           "_get_projects_new",
+        "/v1/projects":            "_get_v1_projects",
         "/v1/sources":             "_get_v1_sources",
         "/v1/keys":                "_get_v1_keys",
         "/v1/providers":           "_get_v1_providers",
@@ -779,6 +836,7 @@ class H(BaseHTTPRequestHandler):
         "/v1/providers":         "_post_v1_providers",
         "/v1/ingest":            "_post_v1_ingest",
         "/v1/keys":              "_post_v1_keys",
+        "/v1/projects":          "_post_v1_projects",
         "/teach/upload":         "_post_teach_upload",
         "/teach/qa":             "_post_teach_qa",
         "/teach/delete":         "_post_teach_delete",
@@ -787,6 +845,8 @@ class H(BaseHTTPRequestHandler):
         "/api/create-key":       "_post_api_create_key",
         "/api/revoke-key":       "_post_api_revoke_key",
         "/playground/run":       "_post_playground_run",
+        "/projects/switch":      "_post_projects_switch",
+        "/projects/create":      "_post_projects_create",
         "/connectors/add":       "_post_old_conn_add",
         "/connectors/toggle":    "_post_old_conn_toggle",
         "/connectors/delete":    "_post_old_conn_delete",
@@ -799,10 +859,41 @@ class H(BaseHTTPRequestHandler):
         ("/v1/keys/revoke/",      "_post_v1_key_revoke"),
         ("/v1/keys/delete/",      "_post_v1_key_delete"),
         ("/v1/sources/delete/",   "_post_v1_source_delete"),
+        ("/v1/projects/delete/",  "_post_v1_project_delete"),
     )
+
+    # ---------- Tenant resolution (URL-prefix only — single source of truth) ----------
+    def _resolve_tenant(self) -> bool:
+        """Inspect self.path. If it starts with `/p/<slug>/...`, strip that
+        prefix off self.path and set self._tenant=slug, self._tenant_explicit=True.
+        Otherwise tenant defaults to 'default' (preserves legacy `/v1/...`).
+
+        Returns False (and sends 404) if the prefix names an unknown project.
+        Stores the original path on self._raw_path so error messages don't lose
+        the slug context."""
+        self._raw_path = self.path
+        self._tenant = "default"
+        self._tenant_explicit = False
+        if not self.path.startswith("/p/"):
+            return True
+        rest = self.path[3:]
+        slash = rest.find("/")
+        if slash <= 0:
+            self._send("not found (use /p/<slug>/...)", 404, "text/plain")
+            return False
+        slug, suffix = rest[:slash], rest[slash:]
+        if not ke_projects.exists(slug):
+            self._send(f"project '{slug}' not found", 404, "text/plain")
+            return False
+        self._tenant = slug
+        self._tenant_explicit = True
+        self.path = suffix or "/"
+        return True
 
     # ---------- Dispatcher + error sink ----------
     def _dispatch(self, exact, prefix):
+        if not self._resolve_tenant():
+            return
         # `/api?revealed_key=...` style: split query before exact lookup.
         base = self.path.split("?", 1)[0]
         name = exact.get(self.path) or exact.get(base)
@@ -850,35 +941,43 @@ class H(BaseHTTPRequestHandler):
         self._send_static(HERE / "console" / "support.js",
                            "application/javascript; charset=utf-8")
 
-    def _get_teach(self):      self._send(view_teach())
-    def _get_models(self):     self._send(view_models())
-    def _get_playground(self): self._send(view_playground())
+    def _get_teach(self):      self._send(view_teach(self._tenant))
+    def _get_models(self):     self._send(view_models(self._tenant))
+    def _get_playground(self): self._send(view_playground(tenant=self._tenant))
+    def _get_projects_new(self): self._send(view_new_project())
 
     def _get_api(self):
         qs = urllib.parse.urlparse(self.path).query
         params = urllib.parse.parse_qs(qs)
-        self._send(view_api(revealed_key=(params.get("revealed_key") or [None])[0]))
+        self._send(view_api(revealed_key=(params.get("revealed_key") or [None])[0],
+                              tenant=self._tenant))
 
     def _get_v1_sources(self):
         info = self._require_apikey()
         if info is None: return
-        self._json({"sources": ke_ingest.list_sources("default")})
+        if not self._require_tenant_match(info): return
+        self._json({"sources": ke_ingest.list_sources(info["tenant_id"])})
 
     def _get_v1_keys(self):
         if not self._require_admin(): return
-        self._json({"keys": ke_keys.list_keys("default")})
+        self._json({"keys": ke_keys.list_keys(self._tenant)})
 
     def _get_v1_providers(self):
         if not self._require_admin(): return
-        self._json({"providers": ke_providers.list_providers("default")})
+        self._json({"providers": ke_providers.list_providers(self._tenant)})
 
     def _get_v1_requests(self):
         if not self._require_admin(): return
-        self._json({"requests": ke_chat.list_requests("default", limit=50)})
+        self._json({"requests": ke_chat.list_requests(self._tenant, limit=50)})
 
     def _get_v1_provider_test(self, name: str):
         if not self._require_admin(): return
-        self._json(ke_providers.test_provider("default", name))
+        self._json(ke_providers.test_provider(self._tenant, name))
+
+    # System-level (not per-project) admin: list every project the operator manages.
+    def _get_v1_projects(self):
+        if not self._require_admin(): return
+        self._json({"projects": ke_projects.list_projects()})
 
     def _get_old_reports(self):    self._send(view_reports())
     def _get_old_connectors(self): self._send(view_connectors())
@@ -891,6 +990,7 @@ class H(BaseHTTPRequestHandler):
     def _post_v1_chat(self):
         info = self._require_apikey()
         if info is None: return
+        if not self._require_tenant_match(info): return
         body = self._json_body()
         model = body.get("model") or "gemini-2.5-flash"
         msgs = body.get("messages") or []
@@ -905,19 +1005,20 @@ class H(BaseHTTPRequestHandler):
     def _post_v1_providers(self):
         if not self._require_admin(): return
         body = self._json_body()
-        pid = ke_providers.add_provider("default", body["name"], body["api_key"],
+        pid = ke_providers.add_provider(self._tenant, body["name"], body["api_key"],
                                           body["default_model"], body.get("base_url"))
         self._json({"id": pid, "name": body["name"],
                     "default_model": body["default_model"]})
 
     def _post_v1_provider_delete(self, suffix: str):
         if not self._require_admin(): return
-        ke_providers.delete_provider("default", int(suffix))
+        ke_providers.delete_provider(self._tenant, int(suffix))
         self._json({"ok": True})
 
     def _post_v1_ingest(self):
         info = self._require_apikey()
         if info is None: return
+        if not self._require_tenant_match(info): return
         if self.headers.get("Content-Type", "").startswith("multipart/"):
             return self._ingest_multipart(info)
         body = self._json_body()
@@ -944,23 +1045,43 @@ class H(BaseHTTPRequestHandler):
     def _post_v1_keys(self):
         if not self._require_admin(): return
         body = self._json_body()
-        self._json(ke_keys.generate("default", body.get("name", "unnamed"),
+        self._json(ke_keys.generate(self._tenant, body.get("name", "unnamed"),
                                      scopes=body.get("scopes"),
                                      rate_per_min=int(body.get("rate_per_min", 60))))
 
     def _post_v1_key_revoke(self, suffix: str):
         if not self._require_admin(): return
-        ke_keys.revoke("default", int(suffix)); self._json({"ok": True})
+        ke_keys.revoke(self._tenant, int(suffix)); self._json({"ok": True})
 
     def _post_v1_key_delete(self, suffix: str):
         if not self._require_admin(): return
-        ke_keys.delete("default", int(suffix)); self._json({"ok": True})
+        ke_keys.delete(self._tenant, int(suffix)); self._json({"ok": True})
 
     def _post_v1_source_delete(self, suffix: str):
         info = self._require_apikey()
         if info is None: return
+        if not self._require_tenant_match(info): return
         ke_ingest.delete_source(info["tenant_id"], int(suffix))
         self._json({"ok": True})
+
+    # ---------- System-level admin: projects CRUD ----------
+    def _post_v1_projects(self):
+        if not self._require_admin(): return
+        body = self._json_body()
+        if not body.get("name") or not body.get("primary_model"):
+            self._json({"error": {"message": "name and primary_model required"}}, 400); return
+        try:
+            p = ke_projects.create(body["name"], body["primary_model"], slug=body.get("slug"))
+            self._json(p)
+        except Exception as e:
+            self._json({"error": {"message": str(e), "type": "invalid_request"}}, 400)
+
+    def _post_v1_project_delete(self, suffix: str):
+        if not self._require_admin(): return
+        try:
+            ke_projects.delete(suffix); self._json({"ok": True})
+        except ValueError as e:
+            self._json({"error": {"message": str(e), "type": "invalid_request"}}, 400)
 
     # ---------- POST handlers (working UI form actions) ----------
     def _post_teach_upload(self):
@@ -969,56 +1090,77 @@ class H(BaseHTTPRequestHandler):
         if field is not None and getattr(field, "filename", None):
             tmp, display = _stash_upload(field)
             try:
-                ke_ingest.ingest_file("default", tmp, title=display,
+                ke_ingest.ingest_file(self._tenant, tmp, title=display,
                                         mime=field.type, added_by="ui")
             finally:
                 try: tmp.unlink(missing_ok=True)
                 except Exception: pass
-        self._redirect("/teach")
+        self._redirect(self._tenant_path("/teach"))
 
     def _post_teach_qa(self):
         f = self._form()
-        ke_ingest.ingest_qa("default", f.get("question", ""),
+        ke_ingest.ingest_qa(self._tenant, f.get("question", ""),
                               f.get("answer", ""), "ui")
-        self._redirect("/teach")
+        self._redirect(self._tenant_path("/teach"))
 
     def _post_teach_delete(self):
-        ke_ingest.delete_source("default", int(self._form()["id"]))
-        self._redirect("/teach")
+        ke_ingest.delete_source(self._tenant, int(self._form()["id"]))
+        self._redirect(self._tenant_path("/teach"))
 
     def _post_models_add(self):
         f = self._form()
-        ke_providers.add_provider("default", f["name"], f["api_key"],
+        ke_providers.add_provider(self._tenant, f["name"], f["api_key"],
                                     f["default_model"], f.get("base_url") or None)
-        self._redirect("/models")
+        self._redirect(self._tenant_path("/models"))
 
     def _post_models_delete(self):
-        ke_providers.delete_provider("default", int(self._form()["id"]))
-        self._redirect("/models")
+        ke_providers.delete_provider(self._tenant, int(self._form()["id"]))
+        self._redirect(self._tenant_path("/models"))
 
     def _post_api_create_key(self):
         # plaintext key rendered in body, never via URL (uses _send_secret →
         # Cache-Control: no-store, Referrer-Policy: no-referrer).
-        k = ke_keys.generate("default", self._form().get("name", "key"))
-        self._send_secret(view_api(revealed_key=k["key"]))
+        k = ke_keys.generate(self._tenant, self._form().get("name", "key"))
+        self._send_secret(view_api(revealed_key=k["key"], tenant=self._tenant))
 
     def _post_api_revoke_key(self):
-        ke_keys.revoke("default", int(self._form()["id"]))
-        self._redirect("/api")
+        ke_keys.revoke(self._tenant, int(self._form()["id"]))
+        self._redirect(self._tenant_path("/api"))
 
     def _post_playground_run(self):
         f = self._form()
         model = f.get("model") or "gemini-2.5-flash"
         q = f.get("q", "")
         try:
-            out = ke_chat.chat("default", model,
+            out = ke_chat.chat(self._tenant, model,
                                 [{"role": "user", "content": q}], k=8)
             txt = out["choices"][0]["message"]["content"]
             cits = out.get("argus_citations", [])
         except Exception as e:
             txt, cits = f"error: {e}", []
         self._send(view_playground(prompt=q, model=model,
-                                     answer=txt, citations=cits))
+                                     answer=txt, citations=cits,
+                                     tenant=self._tenant))
+
+    # ---------- POST handlers (project switcher + creator) ----------
+    def _post_projects_switch(self):
+        slug = self._form().get("slug", "default")
+        if not ke_projects.exists(slug):
+            self._send("not found", 404, "text/plain"); return
+        target = "/teach" if slug == "default" else f"/p/{slug}/teach"
+        self._redirect(target)
+
+    def _post_projects_create(self):
+        f = self._form()
+        name = (f.get("name") or "").strip()
+        model = (f.get("primary_model") or "gemini-2.5-flash").strip()
+        if not name:
+            self._send("name required", 400, "text/plain"); return
+        try:
+            p = ke_projects.create(name, model, slug=f.get("slug") or None)
+        except Exception as e:
+            self._send(f"could not create: {esc(e)}", 400, "text/plain"); return
+        self._redirect(f"/p/{p['slug']}/teach")
 
     # ---------- POST handlers (legacy autopilot pages under /old) ----------
     def _post_old_conn_add(self):
@@ -1067,4 +1209,9 @@ if __name__ == "__main__":
     # Touch admin_token so the bootstrap path runs on first boot and we
     # surface the location in the log.
     _ = ke_secret.admin_token()
+    # Make sure the 'default' project exists so bare /v1/... keeps routing.
+    try:
+        ke_projects.ensure_default()
+    except Exception as e:
+        print(f"[startup] ensure_default failed: {e}", file=sys.stderr)
     ThreadingHTTPServer((BIND, PORT), H).serve_forever()
