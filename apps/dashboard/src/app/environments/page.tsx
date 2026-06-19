@@ -1,95 +1,124 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getMeServerSide } from '@/lib/auth-server';
-import { SignoutButton } from './SignoutButton';
+import { listEnvsServerSide } from '@/lib/envs-server';
+import { AppHeader } from '@/components/app/AppHeader';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * M3 placeholder. Proves end-to-end auth in the browser:
- *   1. server component fetches /auth/me via getMeServerSide()
- *   2. unauthed users get bounced to /signin
- *   3. authed users see their user + orgs straight from the Fastify session
- *
- * The full Odoo-style list+form view of environments ports in M4–M5 once
- * the envs CRUD endpoints land in Fastify (proper org scoping, RBAC).
+ * /environments — Odoo-style list view of every env the user can reach
+ * (folded by org-membership server-side). One row = one env. Click the
+ * name to drill into the form view.
  */
 export default async function EnvironmentsPage() {
   const me = await getMeServerSide();
   if (!me) redirect('/signin?next=/environments');
 
+  const envs = await listEnvsServerSide();
+
   return (
     <div className="min-h-screen bg-bg-0 text-fg-0">
-      <header className="border-b border-line px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span aria-hidden className="text-[18px]">🛰️</span>
-          <span className="font-semibold tracking-tight">Argus</span>
-        </div>
-        <div className="flex items-center gap-4 text-sm">
-          <span className="text-fg-2">
-            {me.user.name ?? me.user.email}
-          </span>
-          <SignoutButton />
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-[1200px] px-6 py-10">
-        <h1 className="text-2xl font-semibold tracking-tight">Environments</h1>
-        <p className="text-fg-2 mt-1.5 text-sm">
-          One per business / workspace / tenant. Each environment has its own connected
-          models, knowledge core, and API keys.
-        </p>
-
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <section className="bg-bg-1 border border-line rounded-xl p-5">
-            <h2 className="text-sm uppercase tracking-wider text-fg-2">You</h2>
-            <dl className="mt-3 text-sm space-y-1.5">
-              <Row k="Name" v={me.user.name ?? '—'} />
-              <Row k="Email" v={me.user.email} />
-              <Row k="User ID" v={<code className="text-xs">{me.user.id}</code>} />
-              <Row k="Super-admin" v={me.user.is_superadmin ? 'yes' : 'no'} />
-            </dl>
-          </section>
-
-          <section className="bg-bg-1 border border-line rounded-xl p-5">
-            <h2 className="text-sm uppercase tracking-wider text-fg-2">
-              Your organizations ({me.orgs.length})
-            </h2>
-            <ul className="mt-3 text-sm space-y-2">
-              {me.orgs.map((o) => (
-                <li key={o.id} className="flex items-baseline justify-between gap-3">
-                  <div>
-                    <div className="font-medium">{o.name}</div>
-                    <div className="text-xs text-fg-3">
-                      slug <code className="text-fg-2">{o.slug}</code>
-                    </div>
-                  </div>
-                  <span className="text-2xs uppercase tracking-wider px-2 py-0.5 rounded bg-blue/10 text-blue">
-                    {o.role}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
+      <AppHeader userLabel={me.user.name ?? me.user.email} />
+      <main className="mx-auto max-w-[1280px] px-4 sm:px-6 py-6 sm:py-8">
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Environments</h1>
+            <p className="text-fg-2 mt-1 text-sm max-w-prose">
+              One per business / workspace / tenant. Each environment has its own
+              connected models, knowledge core, and API keys — fully isolated.
+            </p>
+          </div>
+          <Link
+            href="/environments/new"
+            className="rounded-md bg-blue text-bg-0 font-semibold px-4 py-2 text-sm hover:opacity-90 transition"
+          >
+            + New environment
+          </Link>
         </div>
 
-        <section className="mt-8 bg-bg-1 border border-line rounded-xl p-5">
-          <h2 className="text-sm uppercase tracking-wider text-fg-2">Next up — M4</h2>
-          <p className="text-sm mt-2 text-fg-1">
-            Environments CRUD (list + form view) wired against the new <code>envs</code>{' '}
-            table, scoped by org membership. Then Teach / Models / API / Playground get
-            ported from the Python MVP into Next.js + Tailwind.
-          </p>
-        </section>
+        {envs.length === 0 ? <EmptyState /> : <EnvsTable envs={envs} />}
       </main>
     </div>
   );
 }
 
-function Row({ k, v }: { k: string; v: React.ReactNode }) {
+function EmptyState() {
   return (
-    <div className="flex gap-3">
-      <dt className="w-24 text-fg-3">{k}</dt>
-      <dd className="text-fg-1">{v}</dd>
+    <div className="mt-10 rounded-xl border border-line bg-bg-1 p-10 text-center">
+      <div className="text-fg-2 text-sm">No environments yet.</div>
+      <Link
+        href="/environments/new"
+        className="inline-block mt-4 rounded-md bg-blue text-bg-0 font-semibold px-4 py-2 text-sm hover:opacity-90"
+      >
+        Create your first environment
+      </Link>
+    </div>
+  );
+}
+
+function EnvsTable({ envs }: { envs: Awaited<ReturnType<typeof listEnvsServerSide>> }) {
+  return (
+    <div className="mt-6 rounded-xl border border-line bg-bg-1 overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-bg-2 text-fg-2 text-xs uppercase tracking-wider">
+          <tr>
+            <th className="text-left px-4 py-3">Name</th>
+            <th className="text-left px-4 py-3 hidden sm:table-cell">Organization</th>
+            <th className="text-left px-4 py-3 hidden md:table-cell">Model</th>
+            <th className="text-right px-4 py-3 hidden md:table-cell">Models</th>
+            <th className="text-right px-4 py-3 hidden md:table-cell">Knowledge</th>
+            <th className="text-right px-4 py-3 hidden lg:table-cell">Keys</th>
+            <th className="text-right px-4 py-3 hidden lg:table-cell">Reqs</th>
+            <th className="text-right px-4 py-3 hidden lg:table-cell">Cost</th>
+            <th className="text-right px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {envs.map((e) => (
+            <tr
+              key={e.id}
+              className="border-t border-line hover:bg-bg-2/60 transition"
+            >
+              <td className="px-4 py-3">
+                <Link
+                  href={`/environments/${e.slug}`}
+                  className="text-blue font-medium hover:underline underline-offset-4"
+                >
+                  {e.name}
+                </Link>
+                <div className="text-xs text-fg-3 mt-0.5">
+                  slug <code className="text-fg-2">{e.slug}</code>
+                </div>
+              </td>
+              <td className="px-4 py-3 hidden sm:table-cell text-fg-1">
+                {e.org_name}
+              </td>
+              <td className="px-4 py-3 hidden md:table-cell">
+                <code className="text-xs text-fg-2">{e.primary_model}</code>
+              </td>
+              <td className="px-4 py-3 hidden md:table-cell text-right">{e.providers}</td>
+              <td className="px-4 py-3 hidden md:table-cell text-right">
+                <span className="text-fg-1">{e.sources}</span>
+                <span className="text-fg-3"> src · {e.chunks} chunks</span>
+              </td>
+              <td className="px-4 py-3 hidden lg:table-cell text-right">{e.api_keys}</td>
+              <td className="px-4 py-3 hidden lg:table-cell text-right">{e.requests}</td>
+              <td className="px-4 py-3 hidden lg:table-cell text-right">
+                ${Number(e.cost_usd).toFixed(4)}
+              </td>
+              <td className="px-4 py-3 text-right">
+                <Link
+                  href={`/environments/${e.slug}`}
+                  className="text-xs text-fg-2 hover:text-fg-0 underline-offset-4 hover:underline"
+                >
+                  Open →
+                </Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

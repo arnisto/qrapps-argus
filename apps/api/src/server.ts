@@ -13,6 +13,7 @@ import { registerInvestigationRoutes } from './routes/investigations.js';
 import { registerAlertChannelRoutes } from './routes/alert-channels.js';
 import { registerLlmCredentialRoutes } from './routes/llm-credentials.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerEnvRoutes } from './routes/envs.js';
 import { attachUser } from './auth/middleware.js';
 
 // Routes that are publicly callable WITHOUT a user session or bearer token.
@@ -70,6 +71,7 @@ export async function buildServer() {
   });
 
   await registerAuthRoutes(app);
+  await registerEnvRoutes(app);
   await registerHealthRoutes(app);
   await registerEventRoutes(app);
   await registerFindingRoutes(app);

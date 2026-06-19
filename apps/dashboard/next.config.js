@@ -2,6 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  // Allow overriding the build directory per-process so two dev servers
+  // (e.g. a stale one we can't kill + our fresh one) don't fight over .next.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   experimental: {
     typedRoutes: false,
   },
