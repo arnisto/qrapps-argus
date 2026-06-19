@@ -6,10 +6,26 @@ import { AuthCard } from '@/components/auth/AuthCard';
 import { Field } from '@/components/auth/Field';
 import { signin } from '@/lib/auth-client';
 
+/**
+ * Reject anything that isn't an obviously-safe same-origin relative path.
+ * Blocks:
+ *   · absolute URLs ("https://evil/…", "javascript:…")
+ *   · protocol-relative ("//evil/…") — browsers treat these as absolute
+ *   · backslash-tricks ("/\\evil/…") that some old browsers normalize away
+ *   · anything that doesn't start with a single '/'
+ */
+function safeNext(raw: string | null): string {
+  const fallback = '/environments';
+  if (!raw) return fallback;
+  if (!raw.startsWith('/')) return fallback;
+  if (raw.startsWith('//') || raw.startsWith('/\\')) return fallback;
+  return raw;
+}
+
 export default function SigninPage() {
   const router = useRouter();
   const search = useSearchParams();
-  const next = search.get('next') ?? '/environments';
+  const next = safeNext(search.get('next'));
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +41,8 @@ export default function SigninPage() {
         password: String(form.get('password') ?? ''),
       });
       // Hard nav so the authed shell can re-render with the new session.
+      // `next` has been normalized via safeNext() — guaranteed same-origin
+      // relative path or the /environments fallback.
       window.location.href = next;
     } catch (err) {
       const code = (err as Error).message;
