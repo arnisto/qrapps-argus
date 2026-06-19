@@ -25,6 +25,7 @@ except Exception:                                          # pragma: no cover
 
 
 _HOME_SECRET = Path.home() / ".argus" / "secret"
+_HOME_ADMIN  = Path.home() / ".argus" / "admin_token"
 
 
 def _load_key() -> bytes:
@@ -51,6 +52,24 @@ def _load_key() -> bytes:
     print(f"[engine.secret] generated APP_SECRET at {_HOME_SECRET}. "
           f"Set APP_SECRET env in production.")
     return k
+
+
+def admin_token() -> str:
+    """Bearer token required by /v1/* management endpoints and the operator UI
+    (when bound to a non-loopback interface). Reads ARGUS_ADMIN_TOKEN env, else
+    bootstraps a random one at ~/.argus/admin_token and prints it once."""
+    tok = os.environ.get("ARGUS_ADMIN_TOKEN", "").strip()
+    if tok:
+        return tok
+    if _HOME_ADMIN.exists():
+        return _HOME_ADMIN.read_text().strip()
+    _HOME_ADMIN.parent.mkdir(parents=True, exist_ok=True)
+    new = "argus_admin_" + base64.urlsafe_b64encode(_stdlib_secrets.token_bytes(24)).decode().rstrip("=")
+    _HOME_ADMIN.write_text(new)
+    _HOME_ADMIN.chmod(0o600)
+    print(f"[engine.secret] generated ARGUS_ADMIN_TOKEN at {_HOME_ADMIN} — "
+          f"use it with `Authorization: Bearer <token>` on /v1/* admin endpoints.")
+    return new
 
 
 def encrypt(plaintext: str) -> str:

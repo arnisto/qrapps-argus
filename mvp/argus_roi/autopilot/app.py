@@ -19,9 +19,12 @@ from __future__ import annotations
 
 import cgi
 import glob
+import hmac
 import html
 import io
 import json
+import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -34,6 +37,27 @@ from engine import providers as ke_providers
 from engine import ingest as ke_ingest
 from engine import keys as ke_keys
 from engine import chat as ke_chat
+from engine import secret as ke_secret
+
+
+# --- Safe filename for uploads (prevents path traversal) -------------------
+_UNSAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _safe_filename(raw: str) -> str:
+    name = Path(raw or "").name        # strip ANY directory components
+    name = _UNSAFE_NAME_RE.sub("_", name).strip("._") or "upload"
+    return name[:120]                  # cap length
+
+
+def _stash_upload(field) -> tuple[Path, str]:
+    """Stream a multipart upload to a unique NamedTemporaryFile and keep the
+    sanitised original name only as metadata. Returns (path, display_name)."""
+    safe = _safe_filename(getattr(field, "filename", "") or "upload")
+    with tempfile.NamedTemporaryFile(prefix="argus_up_", suffix="_" + safe,
+                                      delete=False) as tf:
+        tf.write(field.file.read())
+        return Path(tf.name), safe
 
 try:
     import yaml
@@ -649,6 +673,19 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _send_secret(self, body, code=200, ctype="text/html; charset=utf-8"):
+        """Same as _send but with no-store + no-referrer for one-time-secret
+        responses (the create-key plaintext reveal)."""
+        data = body.encode()
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.end_headers()
+        self.wfile.write(data)
+
     def _redirect(self, to):
         self.send_response(303)
         self.send_header("Location", to)
@@ -681,11 +718,23 @@ class H(BaseHTTPRequestHandler):
         return auth[7:].strip() if auth.startswith("Bearer ") else None
 
     def _require_apikey(self):
+        """Per-tenant developer API key (for /v1/chat, /v1/ingest, /v1/sources)."""
         info = ke_keys.verify(self._bearer() or "")
         if not info:
             self._json({"error": {"message": "missing or invalid bearer token", "type": "auth"}}, 401)
             return None
         return info
+
+    def _require_admin(self) -> bool:
+        """Admin token for /v1/* management endpoints (provider config,
+        key issuance, request log, etc.). Uses hmac.compare_digest."""
+        provided = self._bearer() or ""
+        expected = ke_secret.admin_token()
+        if not expected or not hmac.compare_digest(provided, expected):
+            self._json({"error": {"message": "admin token required (set Authorization: Bearer <ARGUS_ADMIN_TOKEN>)",
+                                    "type": "admin_auth"}}, 401)
+            return False
+        return True
 
     def do_GET(self):
         try:
@@ -706,18 +755,22 @@ class H(BaseHTTPRequestHandler):
                 self._send(view_api(revealed_key=(params.get("revealed_key") or [None])[0]))
             elif self.path == "/playground":
                 self._send(view_playground())
-            # ----- Developer JSON API (Bearer-authed) -----
+            # ----- Developer JSON API (per-tenant key required) -----
             elif self.path == "/v1/sources":
                 if self._require_apikey() is None: return
                 self._json({"sources": ke_ingest.list_sources("default")})
+            # ----- Admin JSON API (admin token required) -----
             elif self.path == "/v1/keys":
-                # admin: list keys (no bearer required for now — local single-tenant)
+                if not self._require_admin(): return
                 self._json({"keys": ke_keys.list_keys("default")})
             elif self.path == "/v1/providers":
+                if not self._require_admin(): return
                 self._json({"providers": ke_providers.list_providers("default")})
             elif self.path == "/v1/requests":
+                if not self._require_admin(): return
                 self._json({"requests": ke_chat.list_requests("default", limit=50)})
             elif self.path.startswith("/v1/providers/test/"):
+                if not self._require_admin(): return
                 name = self.path.rsplit("/", 1)[-1]
                 self._json(ke_providers.test_provider("default", name))
             # ----- Old real-data autopilot pages -----
@@ -762,6 +815,7 @@ class H(BaseHTTPRequestHandler):
                 return
 
             if self.path == "/v1/providers":
+                if not self._require_admin(): return
                 body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode())
                 pid = ke_providers.add_provider(
                     "default", body["name"], body["api_key"], body["default_model"],
@@ -770,13 +824,16 @@ class H(BaseHTTPRequestHandler):
                 return
 
             if self.path.startswith("/v1/providers/delete/"):
+                if not self._require_admin(): return
                 pid = int(self.path.rsplit("/", 1)[-1])
                 ke_providers.delete_provider("default", pid)
                 self._json({"ok": True})
                 return
 
             if self.path == "/v1/ingest":
-                # Two flavours: multipart file upload, OR JSON Q&A.
+                # Per-tenant API key required; both multipart and JSON QA paths.
+                info = self._require_apikey()
+                if info is None: return
                 if ctype.startswith("multipart/"):
                     form = cgi.FieldStorage(
                         fp=self.rfile, headers=self.headers,
@@ -784,22 +841,26 @@ class H(BaseHTTPRequestHandler):
                     field = form["file"] if "file" in form else None
                     if field is None or not getattr(field, "filename", None):
                         self._json({"error": {"message": "field 'file' missing"}}, 400); return
-                    tmp = Path(tempfile.gettempdir()) / field.filename
-                    tmp.write_bytes(field.file.read())
-                    result = ke_ingest.ingest_file("default", tmp,
-                                                    title=field.filename,
-                                                    mime=field.type,
-                                                    added_by="ui")
+                    tmp, display = _stash_upload(field)
+                    try:
+                        result = ke_ingest.ingest_file(info["tenant_id"], tmp,
+                                                        title=display,
+                                                        mime=field.type,
+                                                        added_by=f"apikey:{info['id']}")
+                    finally:
+                        try: tmp.unlink(missing_ok=True)
+                        except Exception: pass
                     self._json(result); return
                 body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode())
                 if body.get("kind") == "qa":
-                    self._json(ke_ingest.ingest_qa("default", body["question"], body["answer"],
-                                                    added_by=body.get("added_by", "ui")))
+                    self._json(ke_ingest.ingest_qa(info["tenant_id"], body["question"], body["answer"],
+                                                    added_by=f"apikey:{info['id']}"))
                 else:
                     self._json({"error": {"message": "unknown ingest kind"}}, 400)
                 return
 
             if self.path == "/v1/keys":
+                if not self._require_admin(): return
                 body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode())
                 k = ke_keys.generate("default", body.get("name", "unnamed"),
                                       scopes=body.get("scopes"),
@@ -807,13 +868,17 @@ class H(BaseHTTPRequestHandler):
                 self._json(k); return
 
             if self.path.startswith("/v1/keys/revoke/"):
+                if not self._require_admin(): return
                 ke_keys.revoke("default", int(self.path.rsplit("/", 1)[-1]))
                 self._json({"ok": True}); return
             if self.path.startswith("/v1/keys/delete/"):
+                if not self._require_admin(): return
                 ke_keys.delete("default", int(self.path.rsplit("/", 1)[-1]))
                 self._json({"ok": True}); return
             if self.path.startswith("/v1/sources/delete/"):
-                ke_ingest.delete_source("default", int(self.path.rsplit("/", 1)[-1]))
+                info = self._require_apikey()
+                if info is None: return
+                ke_ingest.delete_source(info["tenant_id"], int(self.path.rsplit("/", 1)[-1]))
                 self._json({"ok": True}); return
 
             # ---------- Working UI form actions ----------
@@ -825,10 +890,13 @@ class H(BaseHTTPRequestHandler):
                     environ={"REQUEST_METHOD": "POST", "CONTENT_TYPE": ctype})
                 field = form["file"] if "file" in form else None
                 if field is not None and getattr(field, "filename", None):
-                    tmp = Path(tempfile.gettempdir()) / field.filename
-                    tmp.write_bytes(field.file.read())
-                    ke_ingest.ingest_file("default", tmp,
-                                            title=field.filename, mime=field.type, added_by="ui")
+                    tmp, display = _stash_upload(field)
+                    try:
+                        ke_ingest.ingest_file("default", tmp,
+                                                title=display, mime=field.type, added_by="ui")
+                    finally:
+                        try: tmp.unlink(missing_ok=True)
+                        except Exception: pass
                 self._redirect("/teach"); return
 
             if self.path == "/teach/qa":
@@ -845,10 +913,11 @@ class H(BaseHTTPRequestHandler):
                 ke_providers.delete_provider("default", int(f["id"])); self._redirect("/models"); return
 
             if self.path == "/api/create-key":
+                # Render the page directly with the plaintext key in the body — never
+                # via the URL (leaks through browser history, access logs, referrers).
+                # _send_secret adds Cache-Control: no-store + Referrer-Policy: no-referrer.
                 k = ke_keys.generate("default", f.get("name", "key"))
-                # surface the plaintext via querystring so /api shows it once
-                self._redirect(f"/api?revealed_id={k['id']}&revealed_key={urllib.parse.quote(k['key'])}")
-                return
+                self._send_secret(view_api(revealed_key=k["key"])); return
             if self.path == "/api/revoke-key":
                 ke_keys.revoke("default", int(f["id"])); self._redirect("/api"); return
 
@@ -900,5 +969,18 @@ class H(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     (HERE / "logs").mkdir(exist_ok=True)
-    print(f"Argus UI → http://localhost:{PORT}", file=sys.stderr)
-    ThreadingHTTPServer(("0.0.0.0", PORT), H).serve_forever()
+    # Bind to loopback by default — the operator UI has no per-user auth,
+    # so any process on the host is the only trust boundary. Override with
+    # ARGUS_BIND=0.0.0.0 if you intentionally need LAN access (and ideally
+    # put a reverse proxy with real auth in front of it).
+    BIND = os.environ.get("ARGUS_BIND", "127.0.0.1")
+    print(f"Argus UI → http://{('localhost' if BIND in ('127.0.0.1','localhost') else BIND)}:{PORT}",
+          file=sys.stderr)
+    if BIND != "127.0.0.1":
+        print(f"[warn] binding to {BIND} — /v1/* admin endpoints require "
+              f"ARGUS_ADMIN_TOKEN; operator UI pages are unauthenticated.",
+              file=sys.stderr)
+    # Touch admin_token so the bootstrap path runs on first boot and we
+    # surface the location in the log.
+    _ = ke_secret.admin_token()
+    ThreadingHTTPServer((BIND, PORT), H).serve_forever()
