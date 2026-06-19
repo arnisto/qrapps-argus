@@ -103,6 +103,10 @@
       </div>
       <div style="flex:1;overflow-y:auto;margin:0 -4px;padding:0 4px;">
       <div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--text-3,#928e84);text-transform:uppercase;padding:4px 10px 6px;">Operate</div>
+      <button onClick="{{ navDashboard }}" style="{{ ns.dashboard }}">
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="11" y="3" width="6" height="6" rx="1.5"/><rect x="3" y="11" width="6" height="6" rx="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.5"/></svg>
+        <span style="flex:1;text-align:left;">Dashboard</span>
+      </button>
       <button onClick="{{ navInbox }}" style="{{ ns.inbox }}">
         <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M2.5 12h3.6l1.2 2.2h5.4L13.9 12h3.6"/></svg>
         <span style="flex:1;text-align:left;">Inbox</span>
@@ -135,6 +139,10 @@
         <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/><rect x="8.5" y="8.5" width="3" height="3"/><path d="M8 2.5v3M12 2.5v3M8 14.5v3M12 14.5v3M2.5 8h3M2.5 12h3M14.5 8h3M14.5 12h3"/></svg>
         <span style="flex:1;text-align:left;">Models</span>
         <span style="{{ badgeModels }}">{{ connectedCount }}</span>
+      </button>
+      <button onClick="{{ navApi }}" style="{{ ns.api }}">
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7.5 5.5L4 10l3.5 4.5M12.5 5.5L16 10l-3.5 4.5"/></svg>
+        <span style="flex:1;text-align:left;">Developer API</span>
       </button>
       <button onClick="{{ navAgents }}" style="{{ ns.agents }}">
         <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="6" width="12" height="9" rx="2.5"/><circle cx="8" cy="10.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="10.5" r="1" fill="currentColor" stroke="none"/><path d="M10 3v3"/></svg>
@@ -188,8 +196,68 @@
     <!-- MAIN -->
     <main style="flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg,#f4f2ee);">
 
+      <!-- ============ DASHBOARD ============ -->
+      <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:1;overflow-y:auto;padding:30px 36px 60px;">
+        <div style="max-width:920px;margin:0 auto;">
+          <h1 style="font-size:22px;font-weight:600;color:var(--text,#1b1a17);margin:0 0 4px;letter-spacing:-.015em;">Good to see you, {{ greetingName }}</h1>
+          <p style="font-size:13.5px;color:var(--text-2,#5f5c54);margin:0 0 24px;">Here’s what your company brain is handling today.</p>
+
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-bottom:16px;">
+            <sc-for list="{{ dashKpis }}" as="k" hint-placeholder-count="6">
+              <button onClick="{{ k.onClick }}" style="{{ k.cardStyle }}">
+                <div style="font-size:28px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:{{ k.color }};line-height:1;">{{ k.value }}</div>
+                <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-top:8px;">{{ k.label }}</div>
+                <div style="font-size:11px;color:var(--text-3,#928e84);margin-top:1px;">{{ k.sub }}</div>
+              </button>
+            </sc-for>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:13px;margin-bottom:16px;">
+            <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:18px;box-shadow:var(--shadow);">
+              <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:4px;">Drafts handled · this week</div>
+              <div style="font-size:11.5px;color:var(--text-3,#928e84);margin-bottom:12px;">58 total · approved or escalated</div>
+              <div style="display:flex;align-items:flex-end;gap:10px;height:120px;">
+                <sc-for list="{{ dashBars }}" as="b" hint-placeholder-count="7">
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end;">
+                    <div style="width:100%;max-width:30px;height:{{ b.h }};background:var(--accent,#2A6FDB);border-radius:5px 5px 0 0;min-height:4px;"></div>
+                    <span style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);">{{ b.d }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:18px;box-shadow:var(--shadow);">
+              <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:14px;">By channel</div>
+              <div style="display:flex;flex-direction:column;gap:13px;">
+                <sc-for list="{{ dashChannels }}" as="c" hint-placeholder-count="4">
+                  <div>
+                    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-2,#5f5c54);"><span>{{ c.name }}</span><span style="font-family:'IBM Plex Mono',monospace;color:var(--text,#1b1a17);">{{ c.pct }}</span></div>
+                    <div style="height:7px;border-radius:4px;background:var(--inset,#f0ede7);overflow:hidden;margin-top:5px;"><div style="height:100%;width:{{ c.pct }};background:{{ c.color }};border-radius:4px;"></div></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:12px;">
+            <span style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text,#1b1a17);">Recent activity</span>
+            <div style="flex:1;height:1px;background:var(--border,#e6e2d9);"></div>
+          </div>
+          <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;overflow:hidden;box-shadow:var(--shadow);">
+            <sc-for list="{{ recentActivity }}" as="a" hint-placeholder-count="5">
+              <div style="display:grid;grid-template-columns:96px 1fr 130px;gap:14px;padding:12px 16px;border-bottom:1px solid var(--border,#e6e2d9);align-items:center;">
+                <span style="{{ a.chip }}">{{ a.action }}</span>
+                <span style="font-size:12.5px;color:var(--text,#1b1a17);">{{ a.detail }}</span>
+                <span style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);text-align:right;">{{ a.actor }} · {{ a.time }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
       <!-- ============ INBOX ============ -->
-      <sc-if value="{{ isInbox }}" hint-placeholder-val="{{ true }}">
+      <sc-if value="{{ isInbox }}" hint-placeholder-val="{{ false }}">
       <div style="flex:1;display:flex;min-height:0;">
 
         <!-- message list -->
@@ -513,7 +581,8 @@
                     <span style="font-size:10.5px;font-weight:500;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);padding:3px 9px;border-radius:6px;">{{ sk }}</span>
                   </sc-for>
                 </div>
-                <div style="display:flex;align-items:center;gap:8px;border-top:1px solid var(--border,#e6e2d9);padding-top:11px;">
+                <div style="display:flex;align-items:flex-start;gap:7px;border-top:1px solid var(--border,#e6e2d9);padding-top:10px;margin-bottom:10px;"><span style="font-size:8.5px;font-weight:700;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace;color:var(--accent,#2A6FDB);flex:none;margin-top:2px;">WHEN</span><span style="font-size:11px;line-height:1.45;color:var(--text-2,#5f5c54);">{{ m.when }}</span></div>
+                <div style="display:flex;align-items:center;gap:8px;">
                   <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--text-2,#5f5c54);"><span style="width:8px;height:8px;border-radius:2px;background:{{ m.envColor }};"></span>{{ m.envName }}</span>
                   <div style="flex:1;"></div>
                   <span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);">{{ m.open }}</span>
@@ -598,6 +667,10 @@
                   <span style="{{ c.statusStyle }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ c.dotColor }};display:inline-block;"></span>{{ c.statusLabel }}</span>
                 </div>
                 <div style="font-size:12.5px;color:var(--text-2,#5f5c54);line-height:1.45;">{{ c.meta }}</div>
+                <div style="display:flex;align-items:flex-start;gap:7px;border-top:1px solid var(--border,#e6e2d9);padding-top:9px;">
+                  <span style="font-size:8.5px;font-weight:700;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace;color:var(--accent,#2A6FDB);flex:none;margin-top:2px;">WHEN</span>
+                  <span style="font-size:11px;line-height:1.45;color:var(--text-2,#5f5c54);">{{ c.when }}</span>
+                </div>
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
                   <span style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);">{{ c.sub }}</span>
                   <button onClick="{{ c.onClick }}" style="{{ c.actionStyle }}">{{ c.actionLabel }}</button>
@@ -622,6 +695,10 @@
                   <span style="{{ c.statusStyle }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ c.dotColor }};display:inline-block;"></span>{{ c.statusLabel }}</span>
                 </div>
                 <div style="font-size:12.5px;color:var(--text-2,#5f5c54);line-height:1.45;">{{ c.meta }}</div>
+                <div style="display:flex;align-items:flex-start;gap:7px;border-top:1px solid var(--border,#e6e2d9);padding-top:9px;">
+                  <span style="font-size:8.5px;font-weight:700;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace;color:var(--accent,#2A6FDB);flex:none;margin-top:2px;">WHEN</span>
+                  <span style="font-size:11px;line-height:1.45;color:var(--text-2,#5f5c54);">{{ c.when }}</span>
+                </div>
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
                   <span style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);">{{ c.sub }}</span>
                   <button onClick="{{ c.onClick }}" style="{{ c.actionStyle }}">{{ c.actionLabel }}</button>
@@ -663,6 +740,7 @@
                     <span style="font-size:10.5px;font-weight:500;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);padding:3px 9px;border-radius:6px;">{{ t }}</span>
                   </sc-for>
                 </div>
+                <div style="display:flex;align-items:flex-start;gap:7px;border-top:1px solid var(--border,#e6e2d9);padding-top:10px;margin-top:11px;"><span style="font-size:8.5px;font-weight:700;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace;color:var(--accent,#2A6FDB);flex:none;margin-top:2px;">WHEN</span><span style="font-size:11.5px;line-height:1.45;color:var(--text-2,#5f5c54);">{{ a.when }}</span></div>
               </div>
             </sc-for>
           </div>
@@ -681,7 +759,8 @@
                     {{ t.state }}
                   </span>
                 </div>
-                <div style="font-size:12px;line-height:1.5;color:var(--text-2,#5f5c54);">{{ t.desc }}</div>
+                <div style="font-size:12px;line-height:1.5;color:var(--text-2,#5f5c54);margin-bottom:9px;">{{ t.desc }}</div>
+                <div style="display:flex;align-items:flex-start;gap:7px;border-top:1px solid var(--border,#e6e2d9);padding-top:9px;"><span style="font-size:8.5px;font-weight:700;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace;color:var(--accent,#2A6FDB);flex:none;margin-top:2px;">WHEN</span><span style="font-size:11px;line-height:1.45;color:var(--text-2,#5f5c54);">{{ t.when }}</span></div>
               </div>
             </sc-for>
           </div>
@@ -717,6 +796,10 @@
                   <span style="{{ c.statusStyle }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ c.dotColor }};display:inline-block;"></span>{{ c.statusLabel }}</span>
                 </div>
                 <div style="font-size:12.5px;color:var(--text-2,#5f5c54);line-height:1.45;">{{ c.meta }}</div>
+                <div style="display:flex;align-items:flex-start;gap:7px;border-top:1px solid var(--border,#e6e2d9);padding-top:9px;">
+                  <span style="font-size:8.5px;font-weight:700;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace;color:var(--accent,#2A6FDB);flex:none;margin-top:2px;">WHEN</span>
+                  <span style="font-size:11px;line-height:1.45;color:var(--text-2,#5f5c54);">{{ c.when }}</span>
+                </div>
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
                   <span style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);">{{ c.sub }}</span>
                   <button onClick="{{ c.onClick }}" style="{{ c.actionStyle }}">{{ c.actionLabel }}</button>
@@ -741,6 +824,10 @@
                   <span style="{{ c.statusStyle }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ c.dotColor }};display:inline-block;"></span>{{ c.statusLabel }}</span>
                 </div>
                 <div style="font-size:12.5px;color:var(--text-2,#5f5c54);line-height:1.45;">{{ c.meta }}</div>
+                <div style="display:flex;align-items:flex-start;gap:7px;border-top:1px solid var(--border,#e6e2d9);padding-top:9px;">
+                  <span style="font-size:8.5px;font-weight:700;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace;color:var(--accent,#2A6FDB);flex:none;margin-top:2px;">WHEN</span>
+                  <span style="font-size:11px;line-height:1.45;color:var(--text-2,#5f5c54);">{{ c.when }}</span>
+                </div>
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
                   <span style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);">{{ c.sub }}</span>
                   <button onClick="{{ c.onClick }}" style="{{ c.actionStyle }}">{{ c.actionLabel }}</button>
@@ -851,6 +938,104 @@
                 </div>
               </div>
             </sc-for>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ DEVELOPER API ============ -->
+      <sc-if value="{{ isApi }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;overflow-y:auto;padding:30px 36px 60px;">
+        <div style="max-width:900px;margin:0 auto;">
+          <h1 style="font-size:21px;font-weight:600;color:var(--text,#1b1a17);margin:0 0 4px;letter-spacing:-.01em;">Developer API</h1>
+          <p style="font-size:13.5px;color:var(--text-2,#5f5c54);margin:0 0 22px;max-width:660px;">Add your private knowledge to any LLM. Point your existing OpenAI SDK at Argus — you keep calling the same models you configured, but every answer is grounded in your indexed knowledge graph, with citations returned.</p>
+
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:26px;">
+            <sc-for list="{{ apiFlow }}" as="p" hint-placeholder-count="4">
+              <span style="{{ p.style }}">{{ p.label }}</span>
+              <sc-if value="{{ p.arrow }}" hint-placeholder-val="{{ true }}"><span style="color:var(--text-3,#928e84);font-size:13px;">→</span></sc-if>
+            </sc-for>
+          </div>
+
+          <!-- connection -->
+          <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow);">
+            <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:12px;">Base URL</div>
+            <div style="display:flex;align-items:center;gap:10px;background:var(--inset,#f0ede7);border:1px solid var(--border,#e6e2d9);border-radius:9px;padding:10px 13px;">
+              <span style="flex:1;font-size:13px;font-family:'IBM Plex Mono',monospace;color:var(--text,#1b1a17);">{{ baseUrl }}</span>
+              <button onClick="{{ onCopyBase }}" style="border:none;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;background:var(--surface,#fff);color:var(--text,#1b1a17);border:1px solid var(--border,#e6e2d9);padding:5px 11px;border-radius:7px;">Copy</button>
+            </div>
+          </div>
+
+          <!-- API keys -->
+          <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:18px 20px;margin-bottom:26px;box-shadow:var(--shadow);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);">API keys</span>
+              <button onClick="{{ createKey }}" style="border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;background:var(--accent,#2A6FDB);color:#fff;padding:6px 12px;border-radius:7px;">+ New key</button>
+            </div>
+            <sc-for list="{{ apiKeys }}" as="k" hint-placeholder-count="2">
+              <div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--border,#e6e2d9);">
+                <div style="width:120px;flex:none;"><div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);">{{ k.label }}</div><div style="font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);">{{ k.created }}</div></div>
+                <span style="flex:1;font-size:12.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-2,#5f5c54);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ k.shown }}</span>
+                <button onClick="{{ k.onReveal }}" style="border:1px solid var(--border,#e6e2d9);cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;background:var(--surface,#fff);color:var(--text-2,#5f5c54);padding:5px 10px;border-radius:6px;flex:none;">{{ k.revealLabel }}</button>
+                <button onClick="{{ k.onCopy }}" style="border:1px solid var(--border,#e6e2d9);cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;background:var(--surface,#fff);color:var(--text-2,#5f5c54);padding:5px 10px;border-radius:6px;flex:none;">Copy</button>
+                <button onClick="{{ k.onRotate }}" style="border:1px solid var(--border,#e6e2d9);cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;background:var(--surface,#fff);color:var(--amber,#a9701a);padding:5px 10px;border-radius:6px;flex:none;">Rotate</button>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- quickstart -->
+          <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:14px;margin-bottom:30px;">
+            <div>
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:11px;">
+                <span style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text,#1b1a17);">Quickstart</span>
+                <div style="display:flex;gap:3px;background:var(--inset,#f0ede7);border-radius:8px;padding:3px;">
+                  <sc-for list="{{ apiTabs }}" as="tb" hint-placeholder-count="3"><button onClick="{{ tb.onClick }}" style="{{ tb.style }}">{{ tb.label }}</button></sc-for>
+                </div>
+              </div>
+              <div style="position:relative;background:var(--inset,#f0ede7);border:1px solid var(--border,#e6e2d9);border-radius:11px;padding:15px 16px;">
+                <pre style="margin:0;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:var(--text,#1b1a17);white-space:pre;overflow-x:auto;">{{ apiCode }}</pre>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text,#1b1a17);margin-bottom:11px;">Grounded response</div>
+              <div style="background:var(--inset,#f0ede7);border:1px solid var(--border,#e6e2d9);border-radius:11px;padding:15px 16px;">
+                <pre style="margin:0;font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.6;color:var(--text,#1b1a17);white-space:pre;overflow-x:auto;">{{ respSample }}</pre>
+              </div>
+              <div style="font-size:11.5px;color:var(--text-3,#928e84);margin-top:9px;line-height:1.5;">Same response shape as the provider, plus a <span style="font-family:'IBM Plex Mono',monospace;color:var(--accent,#2A6FDB);">citations</span> array sourced from your knowledge graph.</div>
+            </div>
+          </div>
+
+          <!-- endpoints -->
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:13px;">
+            <span style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text,#1b1a17);">Endpoints</span>
+            <div style="flex:1;height:1px;background:var(--border,#e6e2d9);"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:30px;">
+            <sc-for list="{{ apiEndpoints }}" as="e" hint-placeholder-count="4">
+              <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;">
+                  <span style="{{ e.methodChip }}">{{ e.method }}</span>
+                  <span style="font-size:13.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:var(--text,#1b1a17);">{{ e.path }}</span>
+                </div>
+                <div style="font-size:12.5px;line-height:1.5;color:var(--text-2,#5f5c54);margin-bottom:9px;">{{ e.desc }}</div>
+                <div style="display:flex;align-items:flex-start;gap:7px;"><span style="font-size:8.5px;font-weight:700;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace;color:var(--accent,#2A6FDB);flex:none;margin-top:2px;">WHEN</span><span style="font-size:11px;line-height:1.45;color:var(--text-2,#5f5c54);">{{ e.when }}</span></div>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- knowledge + models -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:18px;box-shadow:var(--shadow);">
+              <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:10px;">Knowledge powering this API</div>
+              <div style="font-size:12.5px;line-height:1.6;color:var(--text-2,#5f5c54);">142 files · orders_db · 37 answered questions</div>
+              <div style="font-size:11.5px;font-family:'IBM Plex Mono',monospace;color:var(--text-3,#928e84);margin-top:8px;">197 facts · indexed in pgvector + entity graph (PostgreSQL)</div>
+            </div>
+            <div style="background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:18px;box-shadow:var(--shadow);">
+              <div style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);margin-bottom:12px;">Models you can target</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                <sc-for list="{{ apiModels }}" as="md" hint-placeholder-count="4"><span style="font-size:11px;font-weight:500;font-family:'IBM Plex Mono',monospace;color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);padding:3px 9px;border-radius:6px;">{{ md }}</span></sc-for>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1156,7 +1341,8 @@
                 <span style="font-size:13px;font-weight:600;color:var(--text,#1b1a17);flex:1;">{{ ac.name }}</span>
                 <span style="{{ ac.runnerChip }}">{{ ac.runnerLabel }}</span>
               </div>
-              <div style="font-size:12px;line-height:1.5;color:var(--text-2,#5f5c54);margin-bottom:11px;">{{ ac.desc }}</div>
+              <div style="font-size:12px;line-height:1.5;color:var(--text-2,#5f5c54);margin-bottom:9px;">{{ ac.desc }}</div>
+              <div style="display:flex;align-items:flex-start;gap:6px;background:var(--bg,#f4f2ee);border-radius:7px;padding:7px 9px;margin-bottom:11px;"><span style="font-size:8.5px;font-weight:700;letter-spacing:.06em;font-family:'IBM Plex Mono',monospace;color:var(--accent,#2A6FDB);flex:none;margin-top:2px;">WHEN</span><span style="font-size:11.5px;line-height:1.45;color:var(--text-2,#5f5c54);">{{ ac.when }}</span></div>
               <button onClick="{{ ac.onRun }}" style="{{ ac.btnStyle }}">{{ ac.btnLabel }}</button>
             </div>
           </sc-for>
@@ -1187,7 +1373,7 @@
 class Component extends DCLogic {
   state = {
     theme: 'light',
-    nav: 'inbox',
+    nav: 'dashboard',
     tab: 'needs',
     selectedId: 'm1',
     editing: false,
@@ -1199,6 +1385,11 @@ class Component extends DCLogic {
     addingMember: false, nm: { name: '', role: '', skills: '', env: 'rh' },
     qaQ: '', qaA: '',
     guards: { pi: true, jail: true, strip: true, attach: true, pii_in: true, pii_out: true, secret: true, internal: true, ground: true, tone: false },
+    apiTab: 'python',
+    apiKeys: [
+      { id: 'k1', label: 'Production', key: 'sk-argus-7f3a9c2e4b81', masked: true, created: '12 days ago' },
+      { id: 'k2', label: 'Local dev', key: 'sk-argus-localdev0099', masked: true, created: '3 days ago' },
+    ],
     taught: [
       { kind: 'file', label: 'shipping-policy.pdf', detail: '12 facts extracted', time: '3d ago' },
       { kind: 'qa', label: 'What is your return window?', detail: '30 days for unworn items, full refund with a prepaid label.', time: '12d ago' },
@@ -1213,10 +1404,10 @@ class Component extends DCLogic {
     ],
     tickets: [
       { id: 't1', env: 'rh', title: 'CV received — Frontend Engineer', source: 'email', from: 'mariem.gharbi@gmail.com', text: 'Application from Mariem Gharbi with an attached CV (PDF) for the Frontend Engineer opening.', intent: 'Job application', priority: 'High', status: 'triage', assignee: null, suggested: 'youssef', reason: 'Youssef owns CV screening & interviews, matches the “screening” skill, and has the lightest recruiter load (1 open).', actions: [
-        { name: 'Parse & summarize CV', runner: 'agent', desc: 'Extract experience, skills and education from the attached PDF and summarize against the Frontend Engineer spec in the knowledge core.' },
-        { name: 'Score fit against role', runner: 'agent', desc: 'Rate the candidate 0–100 using the role requirements; flag any missing must-haves.' },
-        { name: 'Draft acknowledgement reply', runner: 'agent', desc: 'Compose a warm receipt email to the candidate — held for human approval before sending.' },
-        { name: 'Schedule screening call', runner: 'human', desc: 'Book a 30-minute intro call and add it to the hiring calendar.' },
+        { name: 'Parse & summarize CV', runner: 'agent', desc: 'Extract experience, skills and education from the attached PDF and summarize against the Frontend Engineer spec in the knowledge core.', when: 'As soon as a CV file is attached.' },
+        { name: 'Score fit against role', runner: 'agent', desc: 'Rate the candidate 0–100 using the role requirements; flag any missing must-haves.', when: 'After the CV is parsed.' },
+        { name: 'Draft acknowledgement reply', runner: 'agent', desc: 'Compose a warm receipt email to the candidate — held for human approval before sending.', when: 'Always, to confirm receipt to the candidate.' },
+        { name: 'Schedule screening call', runner: 'human', desc: 'Book a 30-minute intro call and add it to the hiring calendar.', when: 'Only if the fit score clears the bar.' },
       ] },
       { id: 't2', env: 'rh', title: 'Leave request — 3 days', source: 'email', from: 'omar@yourstore', text: 'Omar requests 3 days of annual leave next month.', intent: 'Time off', priority: 'Low', status: 'assigned', assignee: 'salma', suggested: 'salma', reason: '', actions: [
         { name: 'Check leave balance', runner: 'agent', desc: 'Look up remaining annual leave from the HR records.' },
@@ -1336,6 +1527,12 @@ class Component extends DCLogic {
     this.flash('Learned from ' + files.length + ' file' + (files.length > 1 ? 's' : '') + ' → knowledge core');
     e.target.value = '';
   }
+  setApiTab(t) { this.setState({ apiTab: t }); }
+  copyFlash(label) { try { if (navigator.clipboard) navigator.clipboard.writeText(label); } catch (e) {} this.flash('Copied to clipboard'); }
+  toggleKeyReveal(id) { this.setState({ apiKeys: this.state.apiKeys.map(k => k.id === id ? { ...k, masked: !k.masked } : k) }); }
+  rotateKey(id) { const nv = 'sk-argus-' + Math.random().toString(36).slice(2, 14); this.setState({ apiKeys: this.state.apiKeys.map(k => k.id === id ? { ...k, key: nv, masked: false } : k) }); this.flash('API key rotated'); }
+  createKey() { const nv = 'sk-argus-' + Math.random().toString(36).slice(2, 14); this.setState({ apiKeys: [...this.state.apiKeys, { id: 'k' + Date.now(), label: 'New key', key: nv, masked: false, created: 'just now' }] }); this.flash('API key created'); }
+
   toggleGuard(id) { const g = { ...this.state.guards, [id]: !(this.state.guards[id] !== false) }; this.setState({ guards: g }); this.flash((g[id] ? 'Enabled' : 'Disabled') + ' interceptor'); }
 
   teachQA() {
@@ -1481,7 +1678,7 @@ class Component extends DCLogic {
       const on = s.nav === id;
       return `display:flex;align-items:center;gap:10px;width:100%;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:${on ? 600 : 500};padding:8px 10px;border-radius:8px;margin-bottom:2px;transition:color .12s;background:${on ? 'var(--accent-soft,#eaf1fc)' : 'transparent'};color:${on ? 'var(--accent,#2A6FDB)' : 'var(--text-2,#5f5c54)'};`;
     };
-    const ns = { inbox: navItem('inbox'), chat: navItem('chat'), pipelines: navItem('pipelines'), members: navItem('members'), connectors: navItem('connectors'), models: navItem('models'), agents: navItem('agents'), channels: navItem('channels'), know: navItem('know'), teach: navItem('teach'), gaps: navItem('gaps'), security: navItem('security'), audit: navItem('audit'), settings: navItem('settings') };
+    const ns = { dashboard: navItem('dashboard'), inbox: navItem('inbox'), chat: navItem('chat'), pipelines: navItem('pipelines'), members: navItem('members'), connectors: navItem('connectors'), models: navItem('models'), api: navItem('api'), agents: navItem('agents'), channels: navItem('channels'), know: navItem('know'), teach: navItem('teach'), gaps: navItem('gaps'), security: navItem('security'), audit: navItem('audit'), settings: navItem('settings') };
     const badgePipelines = "font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace;min-width:18px;text-align:center;padding:1px 5px;border-radius:9px;color:var(--accent,#2A6FDB);background:var(--accent-soft,#eaf1fc);";
     const badgeModels = "font-size:10px;font-weight:600;font-family:'IBM Plex Mono',monospace;min-width:18px;text-align:center;padding:1px 5px;border-radius:9px;color:var(--green,#1f8a5b);background:var(--green-soft,#e6f4ec);";
 
@@ -1645,36 +1842,36 @@ class Component extends DCLogic {
       return "display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:" + c[0] + ";background:" + c[1] + ";padding:3px 9px;border-radius:6px;flex:none;";
     };
     const cardOf = (c) => ({
-      mark: c.mark, name: c.name, kindLabel: c.kind, statusLabel: c.status, statusStyle: connStatusChip(c.tone),
+      mark: c.mark, name: c.name, kindLabel: c.kind, statusLabel: c.status, statusStyle: connStatusChip(c.tone), when: c.when,
       dotColor: c.tone === 'off' ? 'var(--text-3,#928e84)' : 'var(--green,#1f8a5b)', meta: c.meta, sub: c.sub, actionLabel: c.action,
       actionStyle: 'border:none;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:7px;flex:none;' + (c.tone === 'off' ? 'background:var(--accent,#2A6FDB);color:#fff;' : 'background:var(--inset,#f0ede7);color:var(--text,#1b1a17);'),
       onClick: () => this.flash((c.action === 'Connect' ? 'Connecting ' : 'Configuring ') + c.name + '…'),
     });
     const connKnowledge = [
-      { mark: 'F', name: 'Files', kind: 'Knowledge source', status: 'Indexed', tone: 'on', meta: '142 documents · PDF, DOCX, MD', sub: 'last added 3d ago', action: 'Configure' },
-      { mark: 'DB', name: 'Database', kind: 'Knowledge source', status: 'Read-only', tone: 'on', meta: 'orders_db · PostgreSQL', sub: 'synced 2h ago', action: 'Configure' },
-      { mark: '@', name: 'Email', kind: 'Knowledge source', status: 'Connected', tone: 'on', meta: 'support@yourstore · IMAP read-only', sub: '318 threads · synced 9m ago', action: 'Configure' },
-      { mark: 'Q', name: 'Answered questions', kind: 'Knowledge source', status: 'Live', tone: 'on', meta: '37 answers from the team', sub: 'last answered 12d ago', action: 'Configure' },
-      { mark: 'N', name: 'Notion / Docs', kind: 'Knowledge source', status: 'Available', tone: 'off', meta: 'Workspace pages & wikis', sub: 'not connected', action: 'Connect' },
+      { mark: 'F', name: 'Files', kind: 'Knowledge source', status: 'Indexed', tone: 'on', meta: '142 documents · PDF, DOCX, MD', sub: 'last added 3d ago', action: 'Configure', when: 'Retrieve when a question needs policy, product or how-to detail.' },
+      { mark: 'DB', name: 'Database', kind: 'Knowledge source', status: 'Read-only', tone: 'on', meta: 'orders_db · PostgreSQL', sub: 'synced 2h ago', action: 'Configure', when: 'Query for live stock, prices and order status.' },
+      { mark: '@', name: 'Email', kind: 'Knowledge source', status: 'Connected', tone: 'on', meta: 'support@yourstore · IMAP read-only', sub: '318 threads · synced 9m ago', action: 'Configure', when: 'Pull past support threads for context on a customer.' },
+      { mark: 'Q', name: 'Answered questions', kind: 'Knowledge source', status: 'Live', tone: 'on', meta: '37 answers from the team', sub: 'last answered 12d ago', action: 'Configure', when: 'Prefer for anything the team has explicitly answered.' },
+      { mark: 'N', name: 'Notion / Docs', kind: 'Knowledge source', status: 'Available', tone: 'off', meta: 'Workspace pages & wikis', sub: 'not connected', action: 'Connect', when: 'Connect to ground answers in internal wikis.' },
     ].map(cardOf);
     const connInbound = [
-      { mark: 'fb', name: 'Facebook Messenger', kind: 'Message source', status: 'Connected', tone: 'on', meta: 'Page @yourstore · webhook verified', sub: '24 messages today', action: 'Configure' },
-      { mark: 'ig', name: 'Instagram DM', kind: 'Message source', status: 'Connected', tone: 'on', meta: '@yourstore', sub: '11 messages today', action: 'Configure' },
-      { mark: 'wa', name: 'WhatsApp Business', kind: 'Message source', status: 'Available', tone: 'off', meta: 'Cloud API', sub: 'not connected', action: 'Connect' },
-      { mark: 'X', name: 'X (Twitter)', kind: 'Message source', status: 'Connected', tone: 'on', meta: 'via generic webhook', sub: '3 messages today', action: 'Configure' },
-      { mark: '{ }', name: 'Generic webhook', kind: 'Message source', status: 'Active', tone: 'on', meta: 'POST /ingest/webhook · HMAC', sub: 'wire any source', action: 'Configure' },
+      { mark: 'fb', name: 'Facebook Messenger', kind: 'Message source', status: 'Connected', tone: 'on', meta: 'Page @yourstore · webhook verified', sub: '24 messages today', action: 'Configure', when: 'Triggers a draft on every new page message.' },
+      { mark: 'ig', name: 'Instagram DM', kind: 'Message source', status: 'Connected', tone: 'on', meta: '@yourstore', sub: '11 messages today', action: 'Configure', when: 'Triggers on DMs and comment replies.' },
+      { mark: 'wa', name: 'WhatsApp Business', kind: 'Message source', status: 'Available', tone: 'off', meta: 'Cloud API', sub: 'not connected', action: 'Connect', when: 'Connect to handle WhatsApp conversations.' },
+      { mark: 'X', name: 'X (Twitter)', kind: 'Message source', status: 'Connected', tone: 'on', meta: 'via generic webhook', sub: '3 messages today', action: 'Configure', when: 'Triggers on mentions and DMs.' },
+      { mark: '{ }', name: 'Generic webhook', kind: 'Message source', status: 'Active', tone: 'on', meta: 'POST /ingest/webhook · HMAC', sub: 'wire any source', action: 'Configure', when: 'Use to wire any custom or unsupported source.' },
     ].map(cardOf);
     const chanReply = [
-      { mark: 'fb', name: 'Facebook Messenger', kind: 'Reply channel', status: 'Connected', tone: 'on', meta: 'Replies to the original thread', sub: '18 sent this week', action: 'Configure' },
-      { mark: 'ig', name: 'Instagram DM', kind: 'Reply channel', status: 'Connected', tone: 'on', meta: '@yourstore', sub: '7 sent this week', action: 'Configure' },
-      { mark: '@', name: 'Email reply', kind: 'Reply channel', status: 'Connected', tone: 'on', meta: 'support@yourstore · SMTP', sub: '12 sent this week', action: 'Configure' },
-      { mark: 'wa', name: 'WhatsApp Business', kind: 'Reply channel', status: 'Not connected', tone: 'off', meta: 'Cloud API', sub: '—', action: 'Connect' },
-      { mark: 'X', name: 'X DM', kind: 'Reply channel', status: 'Connected', tone: 'on', meta: 'via webhook', sub: '2 sent this week', action: 'Configure' },
+      { mark: 'fb', name: 'Facebook Messenger', kind: 'Reply channel', status: 'Connected', tone: 'on', meta: 'Replies to the original thread', sub: '18 sent this week', action: 'Configure', when: 'Send here when the message arrived via Facebook.' },
+      { mark: 'ig', name: 'Instagram DM', kind: 'Reply channel', status: 'Connected', tone: 'on', meta: '@yourstore', sub: '7 sent this week', action: 'Configure', when: 'Send here when the message arrived via Instagram.' },
+      { mark: '@', name: 'Email reply', kind: 'Reply channel', status: 'Connected', tone: 'on', meta: 'support@yourstore · SMTP', sub: '12 sent this week', action: 'Configure', when: 'Use for formal or long-form responses.' },
+      { mark: 'wa', name: 'WhatsApp Business', kind: 'Reply channel', status: 'Not connected', tone: 'off', meta: 'Cloud API', sub: '—', action: 'Connect', when: 'Connect to reply on WhatsApp.' },
+      { mark: 'X', name: 'X DM', kind: 'Reply channel', status: 'Connected', tone: 'on', meta: 'via webhook', sub: '2 sent this week', action: 'Configure', when: 'Send here when the message arrived via X.' },
     ].map(cardOf);
     const chanApproval = [
-      { mark: 'sl', name: 'Slack', kind: 'Approval surface', status: 'Connected', tone: 'on', meta: '#argus-approvals', sub: 'one-tap approve from Slack', action: 'Configure' },
-      { mark: '{ }', name: 'Generic webhook', kind: 'Approval surface', status: 'Active', tone: 'on', meta: 'POST your endpoint', sub: 'wire your own surface', action: 'Configure' },
-      { mark: '◎', name: 'In-app inbox', kind: 'Approval surface', status: 'Always on', tone: 'on', meta: 'this console', sub: 'default approval surface', action: 'Configure' },
+      { mark: 'sl', name: 'Slack', kind: 'Approval surface', status: 'Connected', tone: 'on', meta: '#argus-approvals', sub: 'one-tap approve from Slack', action: 'Configure', when: 'Notify here when a draft needs human approval.' },
+      { mark: '{ }', name: 'Generic webhook', kind: 'Approval surface', status: 'Active', tone: 'on', meta: 'POST your endpoint', sub: 'wire your own surface', action: 'Configure', when: 'Use to route approvals into your own tool.' },
+      { mark: '◎', name: 'In-app inbox', kind: 'Approval surface', status: 'Always on', tone: 'on', meta: 'this console', sub: 'default approval surface', action: 'Configure', when: 'Fallback approval surface — always on.' },
     ].map(cardOf);
 
     const pipe = [{ label: 'Classify' }, { label: 'Retrieve' }, { label: 'Draft' }, { label: 'Approve · human', accent: true }, { label: 'Send' }];
@@ -1683,18 +1880,18 @@ class Component extends DCLogic {
       style: "font-size:11.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;padding:7px 13px;border-radius:8px;white-space:nowrap;" + (p.accent ? 'color:var(--accent,#2A6FDB);background:var(--accent-soft,#eaf1fc);box-shadow:inset 0 0 0 1.5px var(--accent,#2A6FDB);' : 'color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);'),
     }));
     const agents = [
-      { step: '1', name: 'Classifier', role: 'Detects intent, urgency and language on every inbound message.', model: 'qwen2.5:14b → gpt-4o-mini', tools: ['Language detect', 'Intent'] },
-      { step: '2', name: 'Retriever', role: 'Pulls grounded facts from the knowledge core and scores confidence.', model: 'pgvector + entity graph', tools: ['Knowledge search', 'Read-only DB', 'Confidence'] },
-      { step: '3', name: 'Drafter', role: 'Composes a grounded, on-brand reply — in Darija when the message is Darija.', model: 'gpt-4o-mini · qwen2.5 local', tools: ['Knowledge search', 'Darija translate', 'Cite sources'] },
-      { step: '4', name: 'Gap detector', role: 'Flags what the brain doesn’t know yet and opens an interview-loop question.', model: 'rule + qwen2.5', tools: ['Confidence', 'Open gap'] },
+      { step: '1', name: 'Classifier', role: 'Detects intent, urgency and language on every inbound message.', model: 'qwen2.5:14b → gpt-4o-mini', tools: ['Language detect', 'Intent'], when: 'Runs first on every inbound message.' },
+      { step: '2', name: 'Retriever', role: 'Pulls grounded facts from the knowledge core and scores confidence.', model: 'pgvector + entity graph', tools: ['Knowledge search', 'Read-only DB', 'Confidence'], when: 'Runs once the message is classified.' },
+      { step: '3', name: 'Drafter', role: 'Composes a grounded, on-brand reply — in Darija when the message is Darija.', model: 'gpt-4o-mini · qwen2.5 local', tools: ['Knowledge search', 'Darija translate', 'Cite sources'], when: 'Runs when confidence is above the threshold.' },
+      { step: '4', name: 'Gap detector', role: 'Flags what the brain doesn’t know yet and opens an interview-loop question.', model: 'rule + qwen2.5', tools: ['Confidence', 'Open gap'], when: 'Runs when no grounded fact answers the message.' },
     ];
     const tools = [
-      { name: 'Knowledge search', desc: 'Semantic search over pgvector + entity graph.', state: 'Enabled', locked: false },
-      { name: 'Read-only DB query', desc: 'Query connected databases — zero write capability.', state: 'Read-only', locked: true },
-      { name: 'Darija translate', desc: 'Local Qwen / Gemma for Tunisian Derja drafting.', state: 'Enabled', locked: false },
-      { name: 'Confidence scoring', desc: 'Grounded-only threshold, default 0.60.', state: 'Enabled', locked: false },
-      { name: 'Escalate to human', desc: 'Hand off low-confidence or sensitive messages.', state: 'Always on', locked: true },
-      { name: 'Send via channel', desc: 'Deliver an approved reply to an output channel.', state: 'Needs approval', locked: true },
+      { name: 'Knowledge search', desc: 'Semantic search over pgvector + entity graph.', state: 'Enabled', locked: false, when: 'Call to ground any factual claim.' },
+      { name: 'Read-only DB query', desc: 'Query connected databases — zero write capability.', state: 'Read-only', locked: true, when: 'Call for live stock, price or order data.' },
+      { name: 'Darija translate', desc: 'Local Qwen / Gemma for Tunisian Derja drafting.', state: 'Enabled', locked: false, when: 'Call when the message is in Darija/Arabic.' },
+      { name: 'Confidence scoring', desc: 'Grounded-only threshold, default 0.60.', state: 'Enabled', locked: false, when: 'Runs on every draft before it is offered.' },
+      { name: 'Escalate to human', desc: 'Hand off low-confidence or sensitive messages.', state: 'Always on', locked: true, when: 'Call when confidence is low or topic is sensitive.' },
+      { name: 'Send via channel', desc: 'Deliver an approved reply to an output channel.', state: 'Needs approval', locked: true, when: 'Call only after a human approves the draft.' },
     ].map(t => ({ ...t, chipStyle: connStatusChip('on') }));
 
     // models (LLM gateway)
@@ -1747,6 +1944,7 @@ class Component extends DCLogic {
     const memberVM = (m) => ({
       id: m.id, name: m.name, initials: m.initials, role: m.role, skills: m.skills, envName: ENVS[m.env].name, envColor: envColorOf(m.env),
       status: m.status, statusLabel: m.status === 'online' ? 'Online' : 'Away', statusColor: m.status === 'online' ? 'var(--green,#1f8a5b)' : 'var(--amber,#a9701a)', open: m.open + ' open',
+      when: 'Route here for ' + (m.skills || []).slice(0, 3).join(', ').toLowerCase() + '.',
       avatarStyle: 'width:42px;height:42px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#fff;background:' + envColorOf(m.env) + ';',
     });
     const membersFiltered = s.members.filter(m => inEnv(m.env)).map(memberVM);
@@ -1780,7 +1978,7 @@ class Component extends DCLogic {
       const actions = (tObj.actions || []).map((ac, idx) => {
         const done = !!s.actionDone[tObj.id + ':' + idx];
         return {
-          name: ac.name, desc: ac.desc, runnerLabel: ac.runner === 'agent' ? 'Agent can run' : 'Needs a person',
+          name: ac.name, desc: ac.desc, when: ac.when || (ac.runner === 'agent' ? 'When it can be completed automatically from grounded facts.' : 'When a person’s judgment or a real-world step is required.'), runnerLabel: ac.runner === 'agent' ? 'Agent can run' : 'Needs a person',
           runnerChip: "display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;letter-spacing:.03em;font-family:'IBM Plex Mono',monospace;padding:2px 7px;border-radius:5px;" + (ac.runner === 'agent' ? 'color:var(--accent,#2A6FDB);background:var(--accent-soft,#eaf1fc);' : 'color:var(--amber,#a9701a);background:var(--amber-soft,#f6ecda);'),
           done, btnLabel: done ? '✓ Done' : (ac.runner === 'agent' ? 'Run with agent' : 'Assign a person'),
           btnStyle: 'border:none;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:7px;flex:none;' + (done ? 'background:var(--green-soft,#e6f4ec);color:var(--green,#1f8a5b);' : (ac.runner === 'agent' ? 'background:var(--accent,#2A6FDB);color:#fff;' : 'background:var(--inset,#f0ede7);color:var(--text,#1b1a17);')),
@@ -1803,6 +2001,38 @@ class Component extends DCLogic {
     const nmEnvOptions = ['marketing', 'sales', 'rh'].map(id => ({
       name: ENVS[id].name, onClick: () => this.setNm({ env: id }),
       style: 'border:1px solid ' + (nm.env === id ? 'var(--accent,#2A6FDB)' : 'var(--border,#e6e2d9)') + ';cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;padding:7px 13px;border-radius:8px;background:' + (nm.env === id ? 'var(--accent-soft,#eaf1fc)' : 'var(--surface,#fff)') + ';color:' + (nm.env === id ? 'var(--accent,#2A6FDB)' : 'var(--text-2,#5f5c54)') + ';',
+    }));
+
+    // ===== developer API =====
+    const baseUrl = 'https://argus.local/v1';
+    const apiTabs = [['curl', 'cURL'], ['python', 'Python'], ['js', 'JavaScript']].map(([id, label]) => ({
+      label, onClick: () => this.setApiTab(id),
+      style: "border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;padding:6px 13px;border-radius:7px;" + (s.apiTab === id ? 'background:var(--surface,#fff);color:var(--text,#1b1a17);box-shadow:0 1px 2px rgba(0,0,0,.1);' : 'background:transparent;color:var(--text-3,#928e84);'),
+    }));
+    const codeSamples = {
+      curl: 'curl ' + baseUrl + '/chat/completions \\\n  -H "Authorization: Bearer sk-argus-7f3a…" \\\n  -H "Content-Type: application/json" \\\n  -d \'{\n    "model": "gpt-4o-mini",\n    "messages": [\n      { "role": "user", "content": "Do you ship to Germany?" }\n    ]\n  }\'',
+      python: 'from openai import OpenAI\n\n# Point the SDK at Argus instead of the provider\nclient = OpenAI(\n    base_url="' + baseUrl + '",\n    api_key="sk-argus-7f3a…",\n)\n\nresp = client.chat.completions.create(\n    model="gpt-4o-mini",          # any model you configured\n    messages=[{"role": "user", "content": "Do you ship to Germany?"}],\n)\n\nprint(resp.choices[0].message.content)  # grounded in YOUR knowledge\nprint(resp.citations)                   # sources from the graph',
+      js: 'import OpenAI from "openai";\n\nconst client = new OpenAI({\n  baseURL: "' + baseUrl + '",\n  apiKey: "sk-argus-7f3a…",\n});\n\nconst r = await client.chat.completions.create({\n  model: "gpt-4o-mini",\n  messages: [{ role: "user", content: "Do you ship to Germany?" }],\n});\n\nconsole.log(r.choices[0].message.content);\nconsole.log(r.citations); // grounded sources',
+    };
+    const apiCode = codeSamples[s.apiTab] || codeSamples.python;
+    const respSample = '{\n  "choices": [{\n    "message": {\n      "role": "assistant",\n      "content": "Yes — we ship to Germany. Standard EU\\n                  delivery is 4–7 business days via DHL."\n    }\n  }],\n  "citations": [\n    { "source": "shipping-policy.pdf", "type": "file", "confidence": 0.96 }\n  ],\n  "grounded": true\n}';
+    const apiKeys = s.apiKeys.map(k => ({
+      label: k.label, created: k.created, masked: k.masked,
+      shown: k.masked ? (k.key.slice(0, 11) + '••••••' + k.key.slice(-3)) : k.key,
+      revealLabel: k.masked ? 'Reveal' : 'Hide',
+      onReveal: () => this.toggleKeyReveal(k.id), onCopy: () => this.copyFlash(k.key), onRotate: () => this.rotateKey(k.id),
+    }));
+    const methodChipOf = (m) => "font-size:9.5px;font-weight:700;font-family:'IBM Plex Mono',monospace;padding:3px 8px;border-radius:5px;flex:none;" + (m === 'GET' ? 'color:var(--green,#1f8a5b);background:var(--green-soft,#e6f4ec);' : 'color:var(--accent,#2A6FDB);background:var(--accent-soft,#eaf1fc);');
+    const apiEndpoints = [
+      { method: 'POST', path: '/v1/chat/completions', desc: 'OpenAI-compatible chat. Knowledge is retrieved and injected automatically before your configured model runs.', when: 'Drop-in replacement — just change base_url.' },
+      { method: 'POST', path: '/v1/answer', desc: 'Returns a grounded answer with citations and a confidence score.', when: 'When you want sources and confidence back, not just text.' },
+      { method: 'GET', path: '/v1/knowledge/search', desc: 'Semantic search over the knowledge graph (pgvector + entities). Returns ranked facts.', when: 'To retrieve facts without generating a reply.' },
+      { method: 'POST', path: '/v1/knowledge', desc: 'Teach a fact or document programmatically — embedded and indexed into Postgres.', when: 'To feed knowledge from your own pipeline.' },
+    ].map(e => ({ ...e, methodChip: methodChipOf(e.method) }));
+    const apiModels = ['gpt-4o-mini', 'gpt-4o', 'llama-3.3-70b', 'gemini-1.5-pro', 'qwen2.5:14b · local'];
+    const apiFlow = [{ label: 'Your app' }, { label: 'Retrieve knowledge' }, { label: 'Your LLM' }, { label: 'Grounded answer + citations', accent: true }].map((p, i, arr) => ({
+      label: p.label, arrow: i < arr.length - 1,
+      style: "font-size:11.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;padding:7px 13px;border-radius:8px;white-space:nowrap;" + (p.accent ? 'color:var(--accent,#2A6FDB);background:var(--accent-soft,#eaf1fc);box-shadow:inset 0 0 0 1.5px var(--accent,#2A6FDB);' : 'color:var(--text-2,#5f5c54);background:var(--inset,#f0ede7);'),
     }));
 
     // ===== security: input & output interceptors =====
@@ -1864,6 +2094,26 @@ class Component extends DCLogic {
     // audit
     const audit = s.audit.map(a => ({ ...a, chip: this.actionChip(a.action) }));
 
+    // dashboard
+    const kpiCard = 'background:var(--surface,#fff);border:1px solid var(--border,#e6e2d9);border-radius:13px;padding:16px 17px;box-shadow:var(--shadow);cursor:pointer;text-align:left;width:100%;font-family:inherit;display:block;';
+    const dashKpis = [
+      { label: 'Needs review', value: String(needsCount), sub: 'awaiting approval', color: 'var(--accent,#2A6FDB)', onClick: () => this.setNav('inbox') },
+      { label: 'Open tickets', value: String(openTicketsCount), sub: 'across teams', color: '#c2742e', onClick: () => this.setNav('pipelines') },
+      { label: 'Open gaps', value: String(gapsOpen), sub: 'interview loop', color: 'var(--red,#bb3a2c)', onClick: () => this.setNav('gaps') },
+      { label: 'Threats blocked', value: '11', sub: 'today', color: 'var(--green,#1f8a5b)', onClick: () => this.setNav('security') },
+      { label: 'Avg confidence', value: '89%', sub: 'last 100 drafts', color: 'var(--accent,#2A6FDB)', onClick: () => this.setNav('inbox') },
+      { label: 'Knowledge facts', value: '197', sub: 'grounded', color: '#6b5bd6', onClick: () => this.setNav('know') },
+    ].map(k => ({ ...k, cardStyle: kpiCard }));
+    const dayData = [['M', 8], ['T', 12], ['W', 6], ['T', 15], ['F', 11], ['S', 4], ['S', 2]];
+    const dashBars = dayData.map(([d, v]) => ({ d, v: String(v), h: Math.round(v / 15 * 100) + '%' }));
+    const dashChannels = [
+      { name: 'Facebook', pct: '48%', color: 'var(--accent,#2A6FDB)' },
+      { name: 'Instagram', pct: '22%', color: '#6b5bd6' },
+      { name: 'Email', pct: '18%', color: 'var(--green,#1f8a5b)' },
+      { name: 'X · Webhook', pct: '12%', color: '#c2742e' },
+    ];
+    const recentActivity = audit.slice(0, 5);
+
     // settings
     const llmFields = [
       { label: 'Tenant', value: 'local (single)' },
@@ -1888,7 +2138,9 @@ class Component extends DCLogic {
 
     return {
       rootStyle, lightBtn, darkBtn, setLight: () => this.toggleTheme('light'), setDark: () => this.toggleTheme('dark'),
-      ns, navInbox: () => this.setNav('inbox'), navChat: () => this.setNav('chat'), navPipelines: () => this.setNav('pipelines'), navMembers: () => this.setNav('members'), navConnectors: () => this.setNav('connectors'), navModels: () => this.setNav('models'), navAgents: () => this.setNav('agents'), navChannels: () => this.setNav('channels'), navKnow: () => this.setNav('know'), navTeach: () => this.setNav('teach'), navGaps: () => this.setNav('gaps'), navSecurity: () => this.setNav('security'), navAudit: () => this.setNav('audit'), navSettings: () => this.setNav('settings'),
+      ns, navDashboard: () => this.setNav('dashboard'), isDashboard: s.nav === 'dashboard', dashKpis, dashBars, dashChannels, recentActivity, greetingName: 'Lamjed',
+      navInbox: () => this.setNav('inbox'), navChat: () => this.setNav('chat'), navPipelines: () => this.setNav('pipelines'), navMembers: () => this.setNav('members'), navConnectors: () => this.setNav('connectors'), navModels: () => this.setNav('models'), navApi: () => this.setNav('api'), isApi: s.nav === 'api', apiTabs, apiCode, respSample, apiKeys, apiEndpoints, apiModels, apiFlow, baseUrl, onCopyBase: () => this.copyFlash(baseUrl), createKey: () => this.createKey(),
+      navAgents: () => this.setNav('agents'), navChannels: () => this.setNav('channels'), navKnow: () => this.setNav('know'), navTeach: () => this.setNav('teach'), navGaps: () => this.setNav('gaps'), navSecurity: () => this.setNav('security'), navAudit: () => this.setNav('audit'), navSettings: () => this.setNav('settings'),
       inboundGuards, outboundGuards, secEvents, secMetrics, isSecurity: s.nav === 'security',
       needsCount, gapsOpen, badgeNeeds, badgeGaps, badgeModels, connectedCount, badgePipelines, openTicketsCount,
       isInbox: s.nav === 'inbox', isChat: s.nav === 'chat', isPipelines: s.nav === 'pipelines', isMembers: s.nav === 'members', isConnectors: s.nav === 'connectors', isModels: s.nav === 'models', isAgents: s.nav === 'agents', isChannels: s.nav === 'channels', isKnow: s.nav === 'know', isTeach: s.nav === 'teach', isGaps: s.nav === 'gaps', isAudit: s.nav === 'audit', isSettings: s.nav === 'settings',
