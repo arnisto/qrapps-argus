@@ -14,21 +14,23 @@ export function Field({
   const inputId = id ?? inputProps.name;
   return (
     <label htmlFor={inputId} className="block">
-      <span className="block text-xs uppercase tracking-wider text-fg-2 mb-1.5">{label}</span>
+      <span className="block text-2xs font-semibold uppercase tracking-wider text-text-3 mb-1">
+        {label}
+      </span>
       <input
         id={inputId}
         {...inputProps}
         className={[
-          'block w-full rounded-md bg-bg-0 border px-3.5 py-2.5 text-[15px] text-fg-0',
-          'placeholder:text-fg-3 outline-none transition',
-          'focus:border-blue focus:ring-2 focus:ring-blue/30',
-          error ? 'border-rose' : 'border-line',
+          'block w-full rounded-md bg-surface-2 px-3 py-2 text-sm text-text',
+          'placeholder:text-text-3 outline-none transition border',
+          'focus:border-accent focus:shadow-focus',
+          error ? 'border-red' : 'border-border',
         ].join(' ')}
       />
       {error ? (
-        <span className="block text-xs text-rose mt-1.5">{error}</span>
+        <span className="block text-xs text-red mt-1.5">{error}</span>
       ) : hint ? (
-        <span className="block text-xs text-fg-3 mt-1.5">{hint}</span>
+        <span className="block text-xs text-text-3 mt-1.5">{hint}</span>
       ) : null}
     </label>
   );

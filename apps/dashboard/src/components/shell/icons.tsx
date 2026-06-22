@@ -234,3 +234,21 @@ export function IconPlus(p: IconProps) {
     </svg>
   );
 }
+
+export function IconSend(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      {/* paper-plane silhouette — matches stroke 1.5 family */}
+      <path d="M3 10l14-6-6 14-2-6-6-2Z" />
+    </svg>
+  );
+}
+
+export function IconSparkle(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M10 3v4M10 13v4M3 10h4M13 10h4" />
+      <path d="M5.5 5.5l2 2M12.5 12.5l2 2M5.5 14.5l2-2M12.5 7.5l2-2" />
+    </svg>
+  );
+}

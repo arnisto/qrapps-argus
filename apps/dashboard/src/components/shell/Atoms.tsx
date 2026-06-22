@@ -99,14 +99,10 @@ export function OrgSwitcher({ orgs, activeSlug }: { orgs: Membership[]; activeSl
             </Link>
           ))}
           <div className="my-1 h-px bg-border" />
-          <button
-            type="button"
-            onClick={() => alert('Multi-business is M6 — coming next sprint.')}
-            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-sm text-accent hover:bg-accent-soft transition"
-          >
-            <IconPlus size={14} />
-            New business
-          </button>
+          <div className="flex items-center gap-2 px-2.5 py-2 rounded-md text-xs text-text-3 cursor-default">
+            <IconPlus size={14} className="opacity-40" />
+            Multi-org coming soon
+          </div>
         </div>
       ) : null}
     </div>

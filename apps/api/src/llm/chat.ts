@@ -129,8 +129,21 @@ export async function runGroundedChat(
     log?.warn({ err }, 'retrieve_failed_continuing_without_context');
   }
 
+  // Relevance gate: retrieval ALWAYS returns top-k, even if the best chunk
+  // is unrelated. Without this, the model would dutifully cite an irrelevant
+  // chunk while saying "I don't know" — confusing the buyer and breaking
+  // the no_grounded_context warning that powers the inline teach CTA on the
+  // dashboard. Drop the chunks from the prompt entirely if the best
+  // similarity is below the threshold; we still LOG them so we can tune later.
+  // Calibrated against gemini-embedding-001 on warm-paper company docs:
+  // genuinely related queries land 0.65+; tangential 0.55–0.65; unrelated
+  // <0.55. 0.6 is the sweet spot — biases toward honest "I don't know" +
+  // surfacing the teach CTA over confident-but-irrelevant citations.
+  const SIM_THRESHOLD = 0.6;
+  const usableChunks = chunks.filter((c) => c.sim >= SIM_THRESHOLD);
+
   const augmented: OpenAIMessage[] = [
-    { role: 'system', content: SYSTEM_TEMPLATE(buildContextBlock(chunks)) },
+    { role: 'system', content: SYSTEM_TEMPLATE(buildContextBlock(usableChunks)) },
     ...req.messages,
   ];
 
@@ -149,13 +162,14 @@ export async function runGroundedChat(
     req.envId,
     req.apiKeyId,
     resp,
-    chunks.length,
-    chunks.length === 0 ? 'no_grounded_context' : 'ok',
+    usableChunks.length,
+    usableChunks.length === 0 ? 'no_grounded_context' : 'ok',
   ).catch((err) => log?.warn({ err }, 'request_log_insert_failed'));
 
+  // Citations reflect what we actually grounded on — same set the model saw.
   return {
     ...resp,
-    argus_citations: chunks.map((c, i) => ({
+    argus_citations: usableChunks.map((c, i) => ({
       index: i + 1,
       chunk_id: c.chunk_id,
       source_id: c.source_id,
@@ -163,6 +177,6 @@ export async function runGroundedChat(
       source_kind: c.source_kind,
       score: c.score,
     })),
-    ...(chunks.length === 0 ? { argus_warning: 'no_grounded_context' as const } : {}),
+    ...(usableChunks.length === 0 ? { argus_warning: 'no_grounded_context' as const } : {}),
   };
 }

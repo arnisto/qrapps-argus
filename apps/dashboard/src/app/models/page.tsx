@@ -64,8 +64,8 @@ async function ModelsBody({ slug }: { slug: string }) {
           <strong className="text-amber">Gemini is required.</strong>{' '}
           <span className="text-text-2">
             Embeddings run on <code className="font-mono">gemini-embedding-001</code>{' '}
-            (768d) — without a Gemini key, source upload and grounded chat both 412.
-            Groq is chat-only.
+            (768d). Without it, file upload and grounded chat will both refuse.
+            Groq is chat-only — add it after.
           </span>
         </div>
       ) : null}

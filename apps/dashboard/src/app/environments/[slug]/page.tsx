@@ -56,38 +56,61 @@ export default async function EnvDetailPage({
           </p>
         </Card>
 
-        <Card title={`Connected models (${env.providers} real)`}>
+        <Card
+          title={`Connected models (${env.providers})`}
+          href={`/models?env=${env.slug}`}
+          ctaLabel={env.providers === 0 ? 'Connect a model →' : 'Manage models →'}
+        >
           {env.providers === 0 ? (
             <Empty>
-              No providers connected yet — M5 wires the per-env Models page.
+              No providers connected yet. Argus needs Gemini for embeddings; Groq
+              is an optional chat-speed boost.
             </Empty>
           ) : (
             <Empty>
-              {env.providers} provider(s) connected. (List ships in M5.)
+              {env.providers} provider{env.providers === 1 ? '' : 's'} connected.
+              Default model: <code className="font-mono text-text">{env.primary_model}</code>.
             </Empty>
           )}
         </Card>
 
-        <Card title={`API keys (${env.api_keys})`}>
+        <Card
+          title={`API keys (${env.api_keys})`}
+          href={`/developer-api?env=${env.slug}`}
+          ctaLabel={env.api_keys === 0 ? 'Mint a key →' : 'Manage keys →'}
+        >
           <Empty>
-            {env.api_keys} key(s) issued. Minting + revoking lands in M5.
+            {env.api_keys === 0
+              ? 'No keys minted yet. Mint one to call /v1/chat from your code.'
+              : `${env.api_keys} active key${env.api_keys === 1 ? '' : 's'} on file.`}
           </Empty>
         </Card>
 
-        <Card title={`Knowledge (${env.sources} sources · ${env.chunks} chunks)`}>
+        <Card
+          title={`Knowledge (${env.sources} sources · ${env.chunks} chunks)`}
+          href={`/teach?env=${env.slug}`}
+          ctaLabel={env.sources === 0 ? 'Teach Argus →' : 'Add more →'}
+        >
           <Empty>
-            Upload files or add Q&A to give this env real grounded answers (M5).
+            {env.sources === 0
+              ? 'Drop a file or paste a Q&A pair to give this env real grounded answers.'
+              : `${env.chunks} chunk${env.chunks === 1 ? '' : 's'} indexed across ${env.sources} source${env.sources === 1 ? '' : 's'}.`}
           </Empty>
         </Card>
 
-        <Card title="Recent requests">
-          {env.requests === 0 ? (
-            <Empty>No requests yet — try the Playground (M5).</Empty>
-          ) : (
-            <Empty>
-              {env.requests} request(s) so far · total cost ${Number(env.cost_usd).toFixed(4)}
-            </Empty>
-          )}
+        <Card
+          title="Recent activity"
+          href={`/ask?env=${env.slug}`}
+          ctaLabel={env.requests === 0 ? 'Try the Playground →' : 'Ask another →'}
+        >
+          <Empty>
+            {env.requests === 0
+              ? 'No requests yet.'
+              : `${env.requests} request${env.requests === 1 ? '' : 's'} so far · total spend $${Number(env.cost_usd).toFixed(4)}.`}
+            {env.last_request_at
+              ? ` Last call ${env.last_request_at.slice(0, 16).replace('T', ' ')}.`
+              : ''}
+          </Empty>
         </Card>
 
         <Card title="Danger zone" tone="danger">
@@ -102,10 +125,14 @@ function Card({
   title,
   children,
   tone,
+  href,
+  ctaLabel,
 }: {
   title: string;
   children: React.ReactNode;
   tone?: 'danger';
+  href?: string;
+  ctaLabel?: string;
 }) {
   return (
     <section
@@ -116,19 +143,29 @@ function Card({
           : 'bg-surface border border-border',
       ].join(' ')}
     >
-      <h2
-        className={[
-          'text-2xs uppercase tracking-wider mb-3',
-          tone === 'danger' ? 'text-red font-semibold' : 'text-text-3 font-semibold',
-        ].join(' ')}
-      >
-        {title}
-      </h2>
+      <div className="flex items-center justify-between gap-3 border-b border-border pb-3 mb-3">
+        <h2
+          className={[
+            'text-2xs uppercase tracking-wider font-semibold',
+            tone === 'danger' ? 'text-red' : 'text-text-2',
+          ].join(' ')}
+        >
+          {title}
+        </h2>
+        {href && ctaLabel ? (
+          <Link
+            href={href}
+            className="text-2xs font-semibold text-accent hover:underline underline-offset-4"
+          >
+            {ctaLabel}
+          </Link>
+        ) : null}
+      </div>
       {children}
     </section>
   );
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="text-text-3 text-sm">{children}</div>;
+  return <div className="text-text-2 text-sm leading-relaxed">{children}</div>;
 }

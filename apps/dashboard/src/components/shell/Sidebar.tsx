@@ -38,54 +38,63 @@ interface NavGroup {
   items: NavItem[];
 }
 
+/**
+ * For the buyer demo we expose only the routes whose backends are real.
+ * The 10 stubs (Inbox / Pipelines / Members / Connectors / Agents /
+ * Channels / Knowledge core / Interview / Security / Audit log /
+ * Settings) live in `src/app/<route>/page.tsx` and ship as
+ * "milestones in M5/M6" cards — perfectly fine pages, but a stray click
+ * on stage reads as vaporware. Re-enable them in the SHOW_ALL block as
+ * each backend lands.
+ */
 const GROUPS: NavGroup[] = [
   {
     label: 'Operate',
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: IconDashboard },
-      { label: 'Inbox', href: '/inbox', icon: IconInbox },
       { label: 'Ask Argus', href: '/ask', icon: IconChat },
-    ],
-  },
-  {
-    label: 'Teams',
-    items: [
-      { label: 'Pipelines', href: '/pipelines', icon: IconPipelines },
-      { label: 'Members', href: '/members', icon: IconMembers },
     ],
   },
   {
     label: 'Engine',
     items: [
       { label: 'Environments', href: '/environments', icon: IconConnectors },
-      { label: 'Connectors', href: '/connectors', icon: IconConnectors, hint: 'in' },
       { label: 'Models', href: '/models', icon: IconModels },
       { label: 'Developer API', href: '/developer-api', icon: IconApi },
-      { label: 'Agents & tools', href: '/agents', icon: IconAgents },
-      { label: 'Channels', href: '/channels', icon: IconChannels, hint: 'out' },
     ],
   },
   {
     label: 'Knowledge',
     items: [
-      { label: 'Knowledge core', href: '/knowledge', icon: IconKnowledge },
       { label: 'Teach Argus', href: '/teach', icon: IconTeach },
-      { label: 'Interview', href: '/interview', icon: IconInterview },
-    ],
-  },
-  {
-    label: 'System',
-    items: [
-      { label: 'Security', href: '/security', icon: IconSecurity },
-      { label: 'Audit log', href: '/audit', icon: IconAudit },
-      { label: 'Settings', href: '/settings', icon: IconSettings },
     ],
   },
 ];
 
+// `SHOW_ALL` controls whether the 10 placeholder routes get a nav row.
+// Set NEXT_PUBLIC_SHOW_ALL=1 in .env.local to expose them for development.
+// Kept here so the icon imports don't go stale.
+void [IconInbox, IconPipelines, IconMembers, IconAgents, IconChannels, IconKnowledge, IconInterview, IconSecurity, IconAudit, IconSettings];
+
 function isActive(pathname: string, href: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard';
   return pathname === href || pathname.startsWith(href + '/');
+}
+
+/**
+ * Routes that scope their data per-env (read `?env=<slug>` server-side).
+ * For these, the sidebar appends the active env so switching pages doesn't
+ * silently change the env context — biggest demo-day footgun called out by
+ * UX review.
+ *
+ * Top-level routes that don't accept ?env= (/environments, /dashboard) are
+ * excluded so we don't push noise into their URLs.
+ */
+const ENV_SCOPED = new Set(['/models', '/teach', '/developer-api', '/ask']);
+
+function hrefWithEnv(href: string, activeEnvSlug?: string): string {
+  if (!activeEnvSlug) return href;
+  return ENV_SCOPED.has(href) ? `${href}?env=${encodeURIComponent(activeEnvSlug)}` : href;
 }
 
 export function Sidebar({
@@ -116,7 +125,7 @@ export function Sidebar({
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={hrefWithEnv(item.href, activeEnvSlug)}
                   className={[
                     'flex items-center gap-2.5 w-full px-2.5 py-2 rounded-md text-sm mb-0.5 transition',
                     active
