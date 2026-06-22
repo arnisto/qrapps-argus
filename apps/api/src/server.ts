@@ -21,6 +21,7 @@ import { registerSourceRoutes } from './routes/sources.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerPlaygroundRoutes } from './routes/playground.js';
 import { registerMemberRoutes } from './routes/members.js';
+import { registerEnvConnectorRoutes } from './routes/env-connectors.js';
 import { attachUser } from './auth/middleware.js';
 
 // Routes that are publicly callable WITHOUT the dashboard session gate.
@@ -34,6 +35,7 @@ const PUBLIC_PREFIXES = [
   '/auth/signin',
   '/auth/signout',
   '/v1/',
+  '/connectors/catalog',
 ];
 
 // Exact paths that should ALSO bypass the auth gate. Currently just the
@@ -107,6 +109,7 @@ export async function buildServer() {
   await registerChatRoutes(app);
   await registerPlaygroundRoutes(app);
   await registerMemberRoutes(app);
+  await registerEnvConnectorRoutes(app);
   await registerHealthRoutes(app);
   await registerEventRoutes(app);
   await registerFindingRoutes(app);

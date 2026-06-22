@@ -1,13 +1,42 @@
-import { StubPage } from '@/components/shell/StubPage';
+import { AppLayout } from '@/components/shell/AppLayout';
+import { PageShell } from '@/components/shell/PageShell';
+import { EnvPicker, NoEnvsCard } from '@/components/app/EnvPicker';
+import { getActiveEnv } from '@/lib/active-env';
+import { getCatalogServerSide, listConnectorsServerSide } from '@/lib/connectors-server';
+import { ConnectorsMarketplace } from './ConnectorsMarketplace';
+
 export const dynamic = 'force-dynamic';
-export default function ConnectorsPage() {
+
+export default async function ConnectorsPage({
+  searchParams,
+}: {
+  searchParams: { env?: string };
+}) {
+  const active = await getActiveEnv(searchParams.env);
+
   return (
-    <StubPage
-      href="/connectors"
-      title="Connectors"
-      subtitle="Knowledge and message sources — Postgres, Notion, Drive, Gmail, WhatsApp, etc."
-      milestone="M5"
-      body="Each connector lands as a card with status pill (Connected / Connecting / Available), last sync time, and Configure / Test buttons. Argus crawls schemas where it can and surfaces them as knowledge."
-    />
+    <AppLayout activeEnvSlug={active?.current.slug} redirectTarget="/connectors">
+      <PageShell
+        title="Connectors"
+        subtitle="Argus's eyes and ears. Plug in your databases, your team chat, your docs — every connector pulls knowledge into the same indexed store, citable from /v1/chat."
+        actions={active ? <EnvPicker envs={active.all} current={active.current} /> : null}
+        maxWidth="1180px"
+      >
+        {!active ? (
+          <NoEnvsCard />
+        ) : (
+          <ConnectorsBody slug={active.current.slug} />
+        )}
+      </PageShell>
+    </AppLayout>
   );
+}
+
+async function ConnectorsBody({ slug }: { slug: string }) {
+  // Catalog is static + public; the connected list is per-env.
+  const [catalog, connected] = await Promise.all([
+    getCatalogServerSide(),
+    listConnectorsServerSide(slug),
+  ]);
+  return <ConnectorsMarketplace envSlug={slug} catalog={catalog} connected={connected} />;
 }
