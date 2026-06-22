@@ -5,6 +5,7 @@ import { getActiveEnv } from '@/lib/active-env';
 import { listProviders, type ProviderRow } from '@/lib/providers-server';
 import { ConnectProviderForm, type ProviderDef } from './ConnectProviderForm';
 import { ProviderRow as ProviderRowCmp } from './ProviderRow';
+import type { EnvRow } from '@/lib/envs-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,16 +47,23 @@ export default async function ModelsPage({
         subtitle="Connect one or more LLM providers to this environment. Argus routes each /v1/chat call based on the model name: gemini-* → Gemini, llama-*/mixtral-* → Groq."
         actions={active ? <EnvPicker envs={active.all} current={active.current} /> : null}
       >
-        {!active ? <NoEnvsCard /> : <ModelsBody slug={active.current.slug} />}
+        {!active ? <NoEnvsCard /> : <ModelsBody current={active.current} all={active.all} />}
       </PageShell>
     </AppLayout>
   );
 }
 
-async function ModelsBody({ slug }: { slug: string }) {
+async function ModelsBody({ current, all }: { current: EnvRow; all: EnvRow[] }) {
+  const slug = current.slug;
   const providers = await listProviders(slug);
   const byName = new Map(providers.map((p) => [p.name, p]));
   const hasGemini = !!byName.get('gemini');
+  // Same-org siblings only — the share toggle never spans orgs even if
+  // the user has memberships elsewhere.
+  const otherEnvsInOrg = all.filter(
+    (e) => e.org_id === current.org_id && e.slug !== slug,
+  ).length;
+  const orgName = current.org_name;
 
   return (
     <>
@@ -103,7 +111,13 @@ async function ModelsBody({ slug }: { slug: string }) {
                   <>Paste your key — we store it AES-GCM-encrypted; the plaintext never leaves the API after submission.</>
                 )}
               </p>
-              <ConnectProviderForm envSlug={slug} def={def} existing={existing} />
+              <ConnectProviderForm
+                envSlug={slug}
+                def={def}
+                existing={existing}
+                otherEnvsInOrg={otherEnvsInOrg}
+                orgName={orgName}
+              />
             </section>
           );
         })}

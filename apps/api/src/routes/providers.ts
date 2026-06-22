@@ -47,6 +47,12 @@ const CreateBody = z.object({
   // gemini-2.5-flash for a groq write.
   default_model: z.string().min(1).max(120).optional(),
   base_url: z.string().url().optional(),
+  /**
+   * When true, upsert this provider into EVERY env in the same org where
+   * the user has write access. Lets the operator pay for one provider key
+   * and use it across Marketing / Sales / RH without re-typing.
+   */
+  apply_to_org: z.boolean().default(false),
 });
 
 interface ProviderListRow {
@@ -122,14 +128,28 @@ export async function registerProviderRoutes(app: FastifyInstance): Promise<void
           .code(400)
           .send({ error: 'bad_request', issues: parsed.error.issues });
       }
-      const { name, api_key, base_url } = parsed.data;
+      const { name, api_key, base_url, apply_to_org } = parsed.data;
       const default_model = parsed.data.default_model ?? PROVIDER_DEFAULTS[name].default_model;
       const enc = encryptKey(api_key);
-      // Upsert keyed on (env_id, name) — the unique constraint added in
-      // migration 0008 makes this safe and idempotent.
-      const { rows } = await db().query<{ id: string }>(
+
+      // Decide target envs. Default: just this env. With apply_to_org:
+      // every env in THIS env's org (which the user is already a member
+      // of, since resolveEnv passed). We do NOT cross orgs even if the
+      // user has memberships elsewhere — the key was minted in this org's
+      // workspace, so its scope shouldn't silently widen.
+      const targetEnvIds: string[] = [env.id];
+      if (apply_to_org) {
+        const { rows: orgEnvs } = await db().query<{ id: string }>(
+          `SELECT id FROM envs WHERE org_id = $1 AND id <> $2`,
+          [env.org_id, env.id],
+        );
+        for (const e of orgEnvs) targetEnvIds.push(e.id);
+      }
+
+      // Upsert across every target env in one statement.
+      const { rows } = await db().query<{ id: string; env_id: string }>(
         `INSERT INTO providers (env_id, name, base_url, default_model, api_key_ct, api_key_iv)
-              VALUES ($1, $2, $3, $4, $5, $6)
+              SELECT unnest($1::uuid[]), $2, $3, $4, $5, $6
          ON CONFLICT (env_id, name)
          DO UPDATE SET
             base_url = EXCLUDED.base_url,
@@ -137,10 +157,17 @@ export async function registerProviderRoutes(app: FastifyInstance): Promise<void
             api_key_ct = EXCLUDED.api_key_ct,
             api_key_iv = EXCLUDED.api_key_iv,
             enabled = TRUE
-         RETURNING id`,
-        [env.id, name, base_url ?? null, default_model, enc.ct, enc.iv],
+         RETURNING id, env_id`,
+        [targetEnvIds, name, base_url ?? null, default_model, enc.ct, enc.iv],
       );
-      return reply.code(201).send({ provider: { id: rows[0]!.id, name } });
+      // Surface the row corresponding to the env in the URL so the UI
+      // can highlight "this one"; everything else is also confirmed via
+      // applied_to.
+      const self = rows.find((r) => r.env_id === env.id) ?? rows[0]!;
+      return reply.code(201).send({
+        provider: { id: self.id, name },
+        applied_to: rows.length, // = 1 normally, or N if apply_to_org
+      });
     },
   );
 

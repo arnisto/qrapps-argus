@@ -18,15 +18,21 @@ export function PageShell({
   maxWidth?: string;
 }) {
   return (
-    <div className="px-6 sm:px-8 py-6 sm:py-8" style={{ maxWidth, margin: '0 auto' }}>
-      <div className="flex items-end justify-between gap-4 flex-wrap mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-text">{title}</h1>
+    <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-7 lg:py-8" style={{ maxWidth, margin: '0 auto' }}>
+      <div className="flex items-end justify-between gap-3 sm:gap-4 flex-wrap mb-5 sm:mb-6">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-text">
+            {title}
+          </h1>
           {subtitle ? (
-            <p className="text-text-2 mt-1 text-base max-w-prose">{subtitle}</p>
+            <p className="text-text-2 mt-1 text-sm sm:text-base max-w-prose">
+              {subtitle}
+            </p>
           ) : null}
         </div>
-        {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+        {actions ? (
+          <div className="flex items-center gap-2 flex-wrap">{actions}</div>
+        ) : null}
       </div>
       {children}
     </div>

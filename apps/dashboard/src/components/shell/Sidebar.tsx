@@ -69,12 +69,18 @@ const GROUPS: NavGroup[] = [
       { label: 'Teach Argus', href: '/teach', icon: IconTeach },
     ],
   },
+  {
+    label: 'Team',
+    items: [
+      { label: 'Members', href: '/members', icon: IconMembers },
+    ],
+  },
 ];
 
-// `SHOW_ALL` controls whether the 10 placeholder routes get a nav row.
-// Set NEXT_PUBLIC_SHOW_ALL=1 in .env.local to expose them for development.
+// SHOW_ALL controls whether the 9 placeholder routes get a nav row. Set
+// NEXT_PUBLIC_SHOW_ALL=1 in .env.local to expose them for development.
 // Kept here so the icon imports don't go stale.
-void [IconInbox, IconPipelines, IconMembers, IconAgents, IconChannels, IconKnowledge, IconInterview, IconSecurity, IconAudit, IconSettings];
+void [IconInbox, IconPipelines, IconAgents, IconChannels, IconKnowledge, IconInterview, IconSecurity, IconAudit, IconSettings];
 
 function isActive(pathname: string, href: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard';
@@ -107,7 +113,10 @@ export function Sidebar({
   const pathname = usePathname();
   return (
     <aside
-      className="flex-none w-[228px] border-r border-border bg-surface flex flex-col"
+      // Width comes from the parent slot: 228px in the desktop column,
+      // 100% inside the mobile slide-over panel. That way one component
+      // works in both contexts without inner / outer width fights.
+      className="w-full md:w-[228px] h-full border-r border-border bg-surface flex flex-col"
       style={{ minHeight: '0' }}
     >
       <div className="p-3 pb-2">

@@ -235,14 +235,14 @@ function Bubble({
   if (turn.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-accent text-white px-4 py-2.5 text-sm whitespace-pre-wrap">
+        <div className="max-w-[88%] sm:max-w-[80%] rounded-2xl rounded-br-sm bg-accent text-white px-3.5 py-2 sm:px-4 sm:py-2.5 text-sm whitespace-pre-wrap break-words">
           {turn.content}
         </div>
       </div>
     );
   }
   return (
-    <div className="flex gap-3">
+    <div className="flex gap-2 sm:gap-3">
       <div className="flex-none w-8 h-8 rounded-lg bg-accent-soft flex items-center justify-center">
         <BrandMark size={18} />
       </div>

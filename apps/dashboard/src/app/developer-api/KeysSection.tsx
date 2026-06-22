@@ -145,26 +145,27 @@ export function KeysSection({
       {keys.length === 0 ? (
         <div className="text-sm text-text-3">No keys yet — mint one to call /v1/chat.</div>
       ) : (
-        <table className="w-full text-sm">
+        <div className="-mx-1 overflow-x-auto">
+        <table className="w-full text-sm min-w-[520px]">
           <thead className="text-2xs uppercase tracking-wider text-text-3 font-mono">
             <tr>
-              <th className="text-left py-2">Name</th>
-              <th className="text-left py-2">Prefix</th>
-              <th className="text-right py-2">Rate / min</th>
-              <th className="text-left py-2">Last used</th>
-              <th className="py-2"></th>
+              <th className="text-left py-2 px-1">Name</th>
+              <th className="text-left py-2 px-1">Prefix</th>
+              <th className="text-right py-2 px-1">Rate / min</th>
+              <th className="text-left py-2 px-1">Last used</th>
+              <th className="py-2 px-1"></th>
             </tr>
           </thead>
           <tbody>
             {keys.map((k) => (
               <tr key={k.id} className="border-t border-border">
-                <td className="py-2 font-semibold text-text">{k.name}</td>
-                <td className="py-2 font-mono text-2xs text-text-2">{k.key_prefix}</td>
-                <td className="py-2 text-right text-text">{k.rate_per_min}</td>
-                <td className="py-2 font-mono text-2xs text-text-3">
+                <td className="py-2 px-1 font-semibold text-text">{k.name}</td>
+                <td className="py-2 px-1 font-mono text-2xs text-text-2">{k.key_prefix}</td>
+                <td className="py-2 px-1 text-right text-text">{k.rate_per_min}</td>
+                <td className="py-2 px-1 font-mono text-2xs text-text-3 whitespace-nowrap">
                   {k.last_used_at ? k.last_used_at.slice(0, 16).replace('T', ' ') : '—'}
                 </td>
-                <td className="py-2 text-right">
+                <td className="py-2 px-1 text-right">
                   <button
                     type="button"
                     onClick={() => onRevoke(k.id, k.name)}
@@ -177,6 +178,7 @@ export function KeysSection({
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </section>
   );

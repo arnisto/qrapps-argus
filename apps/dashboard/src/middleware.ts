@@ -15,7 +15,8 @@ const PUBLIC_PATTERNS: RegExp[] = [
   /^\/signup(\/|$)/,
   /^\/forgot-password(\/|$)/,
   /^\/reset-password(\/|$)/,
-  /^\/legacy(\/|$)/, // legacy v0.2 pages — gated by bearer token elsewhere
+  /^\/invite(\/|$)/,  // accept-invite landing — handles unauthed sign-up + accept in one flow
+  /^\/legacy(\/|$)/,  // legacy v0.2 pages — gated by bearer token elsewhere
 ];
 
 function isPublic(pathname: string): boolean {

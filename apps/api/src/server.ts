@@ -20,6 +20,7 @@ import { registerApiKeyRoutes } from './routes/api-keys.js';
 import { registerSourceRoutes } from './routes/sources.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerPlaygroundRoutes } from './routes/playground.js';
+import { registerMemberRoutes } from './routes/members.js';
 import { attachUser } from './auth/middleware.js';
 
 // Routes that are publicly callable WITHOUT the dashboard session gate.
@@ -34,6 +35,11 @@ const PUBLIC_PREFIXES = [
   '/auth/signout',
   '/v1/',
 ];
+
+// Exact paths that should ALSO bypass the auth gate. Currently just the
+// public invitation-preview endpoint; the matching /accept route lives
+// under the same prefix but needs to stay authed, so we match exactly.
+const PUBLIC_GET_RE = /^\/invitations\/[^/]+$/;
 
 export async function buildServer() {
   const config = loadConfig();
@@ -75,6 +81,9 @@ export async function buildServer() {
   //     OR the legacy bearer ARGUS_INGEST_TOKEN (workers, connectors).
   app.addHook('onRequest', async (req, reply) => {
     if (PUBLIC_PREFIXES.some((p) => req.url.startsWith(p))) return;
+    // GET on /invitations/:token is public so the invitee can preview the
+    // org name before signing in. /accept stays authed.
+    if (req.method === 'GET' && PUBLIC_GET_RE.test(req.url.split('?')[0]!)) return;
     if (req.user) return;
     const auth = req.headers.authorization;
     if (auth === `Bearer ${config.ingestToken}`) return;
@@ -97,6 +106,7 @@ export async function buildServer() {
   await registerSourceRoutes(app);
   await registerChatRoutes(app);
   await registerPlaygroundRoutes(app);
+  await registerMemberRoutes(app);
   await registerHealthRoutes(app);
   await registerEventRoutes(app);
   await registerFindingRoutes(app);

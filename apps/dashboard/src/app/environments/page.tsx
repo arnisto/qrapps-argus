@@ -48,8 +48,8 @@ function EmptyState() {
 
 function EnvsTable({ envs }: { envs: EnvRow[] }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface shadow-card overflow-hidden">
-      <table className="w-full text-sm">
+    <div className="rounded-2xl border border-border bg-surface shadow-card overflow-x-auto">
+      <table className="w-full text-sm min-w-[480px]">
         <thead className="bg-inset text-text-3 font-mono">
           <tr>
             <th className="text-left px-4 py-3 text-2xs uppercase tracking-wider">Name</th>
