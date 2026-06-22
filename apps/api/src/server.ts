@@ -12,13 +12,27 @@ import { registerAgentRoutes } from './routes/agents.js';
 import { registerInvestigationRoutes } from './routes/investigations.js';
 import { registerAlertChannelRoutes } from './routes/alert-channels.js';
 import { registerLlmCredentialRoutes } from './routes/llm-credentials.js';
+import multipart from '@fastify/multipart';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerEnvRoutes } from './routes/envs.js';
+import { registerProviderRoutes } from './routes/providers.js';
+import { registerApiKeyRoutes } from './routes/api-keys.js';
+import { registerSourceRoutes } from './routes/sources.js';
+import { registerChatRoutes } from './routes/chat.js';
 import { attachUser } from './auth/middleware.js';
 
-// Routes that are publicly callable WITHOUT a user session or bearer token.
-// Everything not in this set goes through the bearer-OR-session gate.
-const PUBLIC_PREFIXES = ['/healthz', '/auth/signup', '/auth/signin', '/auth/signout'];
+// Routes that are publicly callable WITHOUT the dashboard session gate.
+//   · auth/* — the user is in the middle of signing in
+//   · healthz — needs to work for liveness probes
+//   · v1/* — the developer API. Owns its own bearer auth (api_keys table)
+//     so the global gate must NOT 401 it before its handler runs.
+const PUBLIC_PREFIXES = [
+  '/healthz',
+  '/auth/signup',
+  '/auth/signin',
+  '/auth/signout',
+  '/v1/',
+];
 
 export async function buildServer() {
   const config = loadConfig();
@@ -44,6 +58,11 @@ export async function buildServer() {
   });
   await app.register(sensible);
   await app.register(cookie);
+  // Multipart only for source upload — limits enforced per-route. 6 MB
+  // global ceiling so an oversized request doesn't tie up the loop.
+  await app.register(multipart, {
+    limits: { fileSize: 6 * 1024 * 1024, files: 1 },
+  });
 
   // Hydrate req.user from the session cookie if present. Never fails the
   // request — public routes pass through with req.user undefined.
@@ -72,6 +91,10 @@ export async function buildServer() {
 
   await registerAuthRoutes(app);
   await registerEnvRoutes(app);
+  await registerProviderRoutes(app);
+  await registerApiKeyRoutes(app);
+  await registerSourceRoutes(app);
+  await registerChatRoutes(app);
   await registerHealthRoutes(app);
   await registerEventRoutes(app);
   await registerFindingRoutes(app);
