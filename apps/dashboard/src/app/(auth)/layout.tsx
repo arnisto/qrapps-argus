@@ -7,14 +7,14 @@ import type { ReactNode } from 'react';
  */
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-bg-0 text-fg-0 flex flex-col">
-      {/* Soft accent gradient — uses our OKLCH tokens via color-mix. */}
+    <div className="min-h-screen bg-bg text-text flex flex-col">
+      {/* Soft accent gradient — uses design tokens via color-mix. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 -z-10"
         style={{
           background:
-            'radial-gradient(60% 50% at 50% 0%, color-mix(in oklch, var(--blue) 12%, transparent), transparent), radial-gradient(40% 30% at 20% 100%, color-mix(in oklch, var(--emerald) 8%, transparent), transparent)',
+            'radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent), radial-gradient(40% 30% at 20% 100%, color-mix(in srgb, var(--green) 8%, transparent), transparent)',
         }}
       />
       <header className="px-6 py-5 sm:px-10">

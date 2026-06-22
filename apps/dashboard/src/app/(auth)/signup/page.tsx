@@ -25,7 +25,7 @@ export default function SignupPage() {
         name: (form.get('name') as string) || undefined,
         org_name: (form.get('org_name') as string) || undefined,
       });
-      window.location.href = '/environments';
+      window.location.href = '/dashboard';
     } catch (err) {
       const e2 = err as Error & { status?: number; payload?: AuthError };
       if (e2.payload?.error === 'email_already_registered') {

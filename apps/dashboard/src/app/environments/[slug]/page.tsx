@@ -1,60 +1,47 @@
 import Link from 'next/link';
-import { notFound, redirect } from 'next/navigation';
-import { getMeServerSide } from '@/lib/auth-server';
+import { notFound } from 'next/navigation';
+import { AppLayout } from '@/components/shell/AppLayout';
+import { PageShell } from '@/components/shell/PageShell';
 import { getEnvServerSide } from '@/lib/envs-server';
-import { AppHeader } from '@/components/app/AppHeader';
 import { RenameForm } from './RenameForm';
 import { DangerZone } from './DangerZone';
 import { FlashFromQuery } from './FlashFromQuery';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * /environments/[slug] — Odoo-style form view of one env:
- *   Settings (rename + model) · Connected models · API keys · Knowledge ·
- *   Recent requests · Danger zone (delete)
- *
- * Most sub-sections currently say "0 — connect some in M5" because the
- * providers / keys / sources / requests endpoints aren't wired yet. The
- * shape is the source of truth; M5 fills in the data.
- */
 export default async function EnvDetailPage({
   params,
 }: {
   params: { slug: string };
 }) {
-  const me = await getMeServerSide();
-  if (!me) redirect(`/signin?next=/environments/${params.slug}`);
-
   const detail = await getEnvServerSide(params.slug);
   if (!detail) notFound();
-
   const { env } = detail;
-  const apiBase = `http://localhost:4000/v1`; // legacy single-tenant slug; M5 introduces per-env routing
+  const apiBase = `http://localhost:4000/v1`;
 
   return (
-    <div className="min-h-screen bg-bg-0 text-fg-0">
-      <AppHeader userLabel={me.user.name ?? me.user.email} />
-      <main className="mx-auto max-w-[1080px] px-4 sm:px-6 py-6 sm:py-8">
-        <Link
-          href="/environments"
-          className="text-fg-2 text-sm hover:text-fg-0 underline-offset-4 hover:underline"
-        >
-          ← all environments
-        </Link>
-
-        <div className="mt-2 flex items-baseline gap-3 flex-wrap">
-          <h1 className="text-2xl font-semibold tracking-tight">{env.name}</h1>
-          <span className="text-fg-3 text-sm">
-            · <code>{env.slug}</code>
-          </span>
-        </div>
-        <p className="text-fg-2 text-sm mt-1">
-          In <strong>{env.org_name}</strong> · base URL{' '}
-          <code className="text-fg-1">{apiBase}</code> · created{' '}
-          {env.created_at.slice(0, 16).replace('T', ' ')}
-        </p>
-
+    <AppLayout
+      activeEnvSlug={env.slug}
+      redirectTarget={`/environments/${env.slug}`}
+    >
+      <PageShell
+        title={env.name}
+        subtitle={
+          <>
+            In <strong>{env.org_name}</strong> · base URL{' '}
+            <code className="font-mono text-text-2">{apiBase}</code> · created{' '}
+            {env.created_at.slice(0, 16).replace('T', ' ')}
+          </>
+        }
+        actions={
+          <Link
+            href="/environments"
+            className="text-text-2 text-sm hover:text-text underline-offset-4 hover:underline"
+          >
+            ← all environments
+          </Link>
+        }
+      >
         <FlashFromQuery />
 
         <Card title="Settings">
@@ -63,9 +50,9 @@ export default async function EnvDetailPage({
             defaultName={env.name}
             defaultModel={env.primary_model}
           />
-          <p className="text-xs text-fg-3 mt-3">
-            Slug is immutable — it's baked into the URL and into any keys minted under
-            this environment.
+          <p className="text-xs text-text-3 mt-3">
+            Slug is immutable — it's baked into the URL and into any keys minted
+            under this environment.
           </p>
         </Card>
 
@@ -75,7 +62,9 @@ export default async function EnvDetailPage({
               No providers connected yet — M5 wires the per-env Models page.
             </Empty>
           ) : (
-            <Empty>{env.providers} provider(s) connected. (List view ships in M5.)</Empty>
+            <Empty>
+              {env.providers} provider(s) connected. (List ships in M5.)
+            </Empty>
           )}
         </Card>
 
@@ -104,8 +93,8 @@ export default async function EnvDetailPage({
         <Card title="Danger zone" tone="danger">
           <DangerZone slug={env.slug} />
         </Card>
-      </main>
-    </div>
+      </PageShell>
+    </AppLayout>
   );
 }
 
@@ -121,14 +110,16 @@ function Card({
   return (
     <section
       className={[
-        'mt-5 rounded-xl border p-5',
-        tone === 'danger' ? 'bg-bg-1 border-rose/40' : 'bg-bg-1 border-line',
+        'mt-4 rounded-2xl shadow-card p-5',
+        tone === 'danger'
+          ? 'bg-surface border border-red/40'
+          : 'bg-surface border border-border',
       ].join(' ')}
     >
       <h2
         className={[
-          'text-sm uppercase tracking-wider mb-3',
-          tone === 'danger' ? 'text-rose' : 'text-fg-2',
+          'text-2xs uppercase tracking-wider mb-3',
+          tone === 'danger' ? 'text-red font-semibold' : 'text-text-3 font-semibold',
         ].join(' ')}
       >
         {title}
@@ -139,5 +130,5 @@ function Card({
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="text-fg-3 text-sm">{children}</div>;
+  return <div className="text-text-3 text-sm">{children}</div>;
 }

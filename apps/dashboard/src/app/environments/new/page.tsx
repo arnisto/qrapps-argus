@@ -1,31 +1,41 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
+import { AppLayout } from '@/components/shell/AppLayout';
+import { PageShell } from '@/components/shell/PageShell';
 import { getMeServerSide } from '@/lib/auth-server';
-import { AppHeader } from '@/components/app/AppHeader';
 import { NewEnvForm } from './NewEnvForm';
 
 export const dynamic = 'force-dynamic';
 
 export default async function NewEnvPage() {
-  const me = await getMeServerSide();
-  if (!me) redirect('/signin?next=/environments/new');
+  // AppLayout already does the auth check, but we need orgs[0].name for the
+  // copy below; fetch /auth/me locally to surface it.
+  const me = (await getMeServerSide())!;
 
   return (
-    <div className="min-h-screen bg-bg-0 text-fg-0">
-      <AppHeader userLabel={me.user.name ?? me.user.email} />
-      <main className="mx-auto max-w-[640px] px-4 sm:px-6 py-8">
-        <Link href="/environments" className="text-fg-2 text-sm hover:text-fg-0">
-          ← all environments
-        </Link>
-        <h1 className="text-2xl font-semibold tracking-tight mt-2">New environment</h1>
-        <p className="text-fg-2 text-sm mt-1">
-          Creates a fresh tenant in <strong>{me.orgs[0]?.name ?? 'your workspace'}</strong>.
-          You can connect models and ingest knowledge once it exists.
-        </p>
-        <div className="mt-6 rounded-xl border border-line bg-bg-1 p-5 sm:p-6">
+    <AppLayout redirectTarget="/environments/new">
+      <PageShell
+        title="New environment"
+        subtitle={
+          <>
+            Creates a fresh tenant in{' '}
+            <strong>{me.orgs[0]?.name ?? 'your workspace'}</strong>. You can
+            connect models and ingest knowledge once it exists.
+          </>
+        }
+        actions={
+          <Link
+            href="/environments"
+            className="text-text-2 text-sm hover:text-text underline-offset-4 hover:underline"
+          >
+            ← all environments
+          </Link>
+        }
+        maxWidth="640px"
+      >
+        <div className="rounded-2xl border border-border bg-surface shadow-card p-5 sm:p-6">
           <NewEnvForm />
         </div>
-      </main>
-    </div>
+      </PageShell>
+    </AppLayout>
   );
 }
