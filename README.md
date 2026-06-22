@@ -1,164 +1,228 @@
 # Argus
 
-> AI-native operational observability and investigation platform.
+> The knowledge layer that goes in front of any LLM.
 
-Argus is an open-source AI operational intelligence platform that connects to your company databases and continuously analyzes operational events to:
+Argus is the OpenAI-compatible API that **stops your LLM from hallucinating about
+your company** — by injecting grounded citations from the documents and Q&A
+pairs you've taught it. Connect Gemini / Groq / OpenAI / Claude / Ollama,
+upload your knowledge, and call `/v1/chat/completions` exactly like you call
+OpenAI today. The response carries an `argus_citations[]` array naming the
+chunks that grounded the answer.
 
-- generate executive insights
-- detect anomalies
-- investigate suspicious patterns
-- recommend actions automatically
+```
+┌──────────────┐     ┌──────────────────────┐     ┌────────────────┐
+│  Your app    │ ──► │  Argus (knowledge    │ ──► │  Your LLM      │
+│              │     │   layer + retrieval) │     │  (any provider)│
+└──────────────┘     └──────────────────────┘     └────────────────┘
+                              │
+                              ▼
+                     Grounded answer + citations
+```
 
-It is **not** "chat with your database". It is the AI layer that watches your operations and surfaces what matters — without anyone writing SQL or prompts.
+**It is not** "chat with your database". It is the API layer between your
+application and any LLM, so every call is grounded in your data and every
+answer points at the source.
 
 ---
 
-## What Argus Is
+## What's in the box today
 
-Companies already have databases, dashboards, CRMs, ERPs, and operational systems. What executives still lack is **real-time operational reasoning**: anomaly detection, proactive insights, and investigations that connect the dots across systems.
-
-Argus turns operational data into:
-
-- 📊 **Business insights** — what changed, why, and what it costs.
-- 🔍 **AI investigations** — autonomous agents that drill into suspicious patterns.
-- 📑 **Executive reports** — readable, dated summaries of what's happening.
-- 🚨 **Anomaly alerts** — Slack/Discord/email/webhook delivery.
-- ✅ **Operational recommendations** — concrete actions, not dashboards.
-
-```
-Data Sources
-    ↓
-Event Ingestion
-    ↓
-AI Investigators
-    ↓
-Operational Intelligence
-    ↓
-Alerts / Reports / Recommendations
-```
+| | What works | Where |
+|---|---|---|
+| **OpenAI-compatible chat** | `POST /v1/chat/completions` with `Authorization: Bearer ak_live_…` returns the OpenAI shape + `argus_citations[]` + `argus_warning` when retrieval misses | `apps/api/src/routes/chat.ts` |
+| **Multi-provider routing** | Routes by model name: `gemini-*` → Gemini, `llama-*` / `mixtral-*` / `groq/*` → Groq. Embeddings always go through Gemini (`gemini-embedding-001`, 768d) to match the pgvector schema. | `apps/api/src/llm/router.ts` |
+| **Knowledge ingest** | Multi-part file upload (`.md` / `.txt` / `.html`, 5 MB) or Q&A pairs. Chunked (~2048 chars, 256 overlap), embedded inline, indexed into pgvector with HNSW cosine ANN. Q&A is higher-authority than file chunks. | `apps/api/src/routes/sources.ts` · `apps/api/src/llm/chunk.ts` |
+| **Multi-tenant isolation** | Every user belongs to ≥1 **org**. Orgs own **envs** (= per-customer/workspace tenants). Each env has its own connected models, knowledge core, API keys, and request log. Cross-org access is impossible. | `apps/api/src/auth/orgs.ts` |
+| **Auth + sessions** | bcrypt(12 rounds), sha256 session-token hashes, HTTP-only SameSite=Lax cookies, 30-day sliding TTL. Constant-time bcrypt on missing-user signin so timing doesn't leak registration. | `apps/api/src/auth/` |
+| **API keys** | `ak_live_…` minted per-env. Plaintext shown **once**; sha256-hashed at rest. Per-key rate limit + last-used tracking. | `apps/api/src/routes/api-keys.ts` |
+| **Teach-then-ask loop** | Ask Argus a question it doesn't know → "Knowledge gap" inline callout → fill the answer → question auto-resends → grounded reply with citation. One screen, no nav. | `apps/dashboard/src/app/ask/Playground.tsx` |
+| **Members & invitations** | Invite by email + role (owner/admin/member). 14-day shareable link. New users can sign up via the invite link in one form. Last-owner guard. | `apps/api/src/routes/members.ts` · `apps/dashboard/src/app/invite/[token]/` |
+| **Shared provider keys** | One Gemini / Groq key can be applied across every env in an org with one checkbox. Rotating later updates them all atomically. | `apps/api/src/routes/providers.ts` |
+| **Dashboard** | Next.js 14 App Router + Tailwind. Dark/light theme via CSS vars. Mobile-responsive slide-over sidebar. | `apps/dashboard/` |
 
 ---
 
-## Example Output
+## Architecture
 
 ```
-Refund anomalies increased 18%.
-
-Main causes:
-- 3 drivers linked to 42% of suspicious refunds
-- Zone B delivery failures increased after routing update
-- Late deliveries correlate with one warehouse cluster
-
-Estimated monthly impact: €12,400
+┌─────────────────────────────────────────────────────────────────┐
+│                       Browser / your app                        │
+└─────────────────────┬───────────────────────────────────────────┘
+                      │
+        ┌─────────────┴─────────────┐
+        │                           │
+┌───────▼─────────┐         ┌───────▼──────────────┐
+│   Next.js 14    │         │  Your code           │
+│   Dashboard     │         │  (OpenAI client      │
+│   :3033 / 3036  │         │   pointed at         │
+│                 │         │   /v1/chat)          │
+└───────┬─────────┘         └───────┬──────────────┘
+        │  /be/* rewrite            │
+        │  (session cookies)        │  Bearer ak_live_…
+        └────────────┬──────────────┘
+                     │
+          ┌──────────▼──────────────┐
+          │   Fastify API :4000     │
+          │ ─────────────────────── │
+          │ auth, orgs, envs,       │
+          │ providers, api-keys,    │
+          │ sources, chat, members  │
+          └─────┬──────────┬────────┘
+                │          │
+       ┌────────▼──┐   ┌───▼────────────────┐
+       │ Postgres  │   │  External LLMs     │
+       │ + pgvector│   │  Gemini · Groq · …  │
+       │ :5435     │   └────────────────────┘
+       └───────────┘
 ```
+
+- **`apps/api/`** — Fastify, owns DB + migrations, owns auth + sessions + envs + chat
+- **`apps/dashboard/`** — Next.js 14, App Router, server components fetch from `apps/api` over `/be/*` rewrites so cookies scope cleanly
+- **`apps/workers/`** — BullMQ workers (legacy observability — not used by the knowledge-layer product yet)
+- **`packages/`** — `shared` (config, logger, errors), `ai-providers` (legacy), `events`, `connectors`, `investigators` (legacy)
+- **`docker/postgres/migrations/`** — versioned SQL files applied by `apps/api/scripts/migrate.ts`
 
 ---
 
 ## Quickstart
 
 ```bash
-git clone https://github.com/qrapps/argus.git
-cd argus
-cp .env.example .env
-docker compose up
+git clone https://github.com/arnisto/qrapps-argus.git
+cd qrapps-argus
+
+# Bring up Postgres (with pgvector) + Redis
+docker compose up -d postgres redis
+
+# Install deps and run migrations
+pnpm install
+DATABASE_URL="postgres://argus:argus@localhost:5435/argus" \
+  pnpm -F @argus/api db:migrate
+
+# Start the API on :4000
+cd apps/api
+DATABASE_URL="postgres://argus:argus@localhost:5435/argus" \
+REDIS_URL="redis://localhost:6381" \
+ARGUS_INGEST_TOKEN="dev-bearer-token" \
+pnpm dev
+
+# Start the dashboard on :3033 (separate terminal)
+cd apps/dashboard
+INTERNAL_API_URL="http://localhost:4000" pnpm next dev -p 3033
 ```
 
-That's it. Open `http://localhost:3000` for the dashboard, `http://localhost:4000` for the API.
+Open **http://localhost:3033**, sign up. First-time signup auto-creates a
+personal organization for you.
 
-See [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) for the local dev workflow.
+Full walkthrough: **[docs/GETTING_STARTED.md](./docs/GETTING_STARTED.md)**.
 
 ---
 
-## Repo Structure
+## Try it from your terminal
+
+```bash
+# After connecting Gemini in the dashboard's Models page,
+# uploading a markdown doc on Teach, and minting an API key:
+
+curl http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer ak_live_…" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemini-2.5-flash",
+    "messages": [{"role": "user", "content": "What is our refund policy?"}]
+  }'
+```
+
+Response:
+
+```json
+{
+  "id": "chatcmpl-…",
+  "object": "chat.completion",
+  "choices": [{ "message": { "content": "Our refund policy is … [#1]." } }],
+  "usage": { "prompt_tokens": 211, "completion_tokens": 31, "total_tokens": 242 },
+  "argus_citations": [
+    { "index": 1, "source_title": "refund-policy.md", "source_kind": "file", "score": 0.61 }
+  ]
+}
+```
+
+Force routing to Groq (Llama 3.3) at ~2× the speed:
+
+```bash
+… -d '{"model": "llama-3.3-70b-versatile", "messages": [...]}'
+```
+
+When retrieval finds nothing relevant, the response carries
+`"argus_warning": "no_grounded_context"` and the assistant says "I don't have
+that information yet" — instead of hallucinating.
+
+---
+
+## Local stack ports (host-mapped)
+
+| Service | Port | Notes |
+|---|---|---|
+| Postgres (pgvector) | `localhost:5435` | docker container |
+| Redis | `localhost:6381` | docker container |
+| Fastify API | `localhost:4000` | host process, `pnpm dev` |
+| Next.js dashboard | `localhost:3033` | host process, `pnpm next dev -p 3033` |
+
+---
+
+## Repo layout
 
 ```
 qrapps-argus/
 ├── apps/
-│   ├── dashboard/        # Next.js + Tailwind + TS executive UI
-│   ├── api/              # Fastify HTTP API (events, investigations, alerts)
-│   └── workers/          # BullMQ workers running investigators
-│
+│   ├── api/           # Fastify — auth, orgs, envs, chat, provider routing
+│   ├── dashboard/     # Next.js 14 — the operator console
+│   └── workers/       # BullMQ (legacy v0.2 — not used by knowledge-layer)
 ├── packages/
-│   ├── investigators/    # Investigator runtime + builtin templates
-│   ├── connectors/       # Postgres / MySQL / API / Webhook connectors
-│   ├── ai-providers/     # Provider abstraction: Claude, OpenAI, Gemini, Ollama, DeepSeek
-│   ├── events/           # Event schema, validators, bus
-│   └── shared/           # Types, logger, config, utils
-│
-├── docker/               # Per-service Dockerfiles + init scripts
-├── infra/                # Compose overrides, seed data, dev fixtures
-├── docs/                 # Architecture, vision, roadmap, contributing
-└── docker-compose.yml
+│   ├── shared/        # config, logger, errors, severity types
+│   ├── ai-providers/  # legacy v0.2 abstraction (Claude/OpenAI/Gemini wrappers)
+│   ├── connectors/    # legacy v0.2 Postgres connector
+│   ├── events/        # legacy v0.2 event bus
+│   └── investigators/ # legacy v0.2 investigator runtime
+├── docker/
+│   ├── postgres/
+│   │   ├── init.sql              # v0.1/v0.2 base schema
+│   │   └── migrations/           # 0002…0008, applied by apps/api/scripts/migrate.ts
+│   └── api.Dockerfile
+├── docs/
+│   ├── GETTING_STARTED.md        # how to run it locally end-to-end
+│   ├── STATUS.md                 # what's shipped, what's next
+│   ├── ARCHITECTURE.md           # legacy v0.2 architecture
+│   ├── ARCHITECTURE_TARGET.md    # v0.3 target architecture
+│   ├── PUBLIC_EDITION_SPEC.md    # the open-source roadmap
+│   ├── KNOWLEDGE_API_SPEC.md     # /v1/chat/completions API reference
+│   └── … see docs/ for the full list
+├── design/imports/               # claude.ai/design source files for the console
+├── CLAUDE.md                     # operator notes for the Claude Code agent
+├── CHANGELOG.md
+└── README.md
 ```
 
-See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the full design.
-
 ---
 
-## MVP Scope (v0.1)
+## What's NOT in scope today
 
-The first public release deliberately ships only:
+Surfaces visible in the design that are stubbed and ship later (M6+):
 
-- ✅ PostgreSQL connector
-- ✅ Event ingestion pipeline
-- ✅ AI investigator runtime
-- ✅ Slack alerts
-- ✅ Basic executive dashboard
-- ✅ Docker Compose one-command setup
-- ✅ Claude + OpenAI + Gemini provider support
+- **Inbox** — inbound message ingestion (WhatsApp / email / Slack)
+- **Pipelines** — Kanban tickets that Argus drafts replies for
+- **Connectors** — beyond file upload (Notion / Drive / Postgres ingest)
+- **Agents & tools** — multi-step pipelines (Classify → Retrieve → Draft → Approve)
+- **Channels** — outbound message routing
+- **Audit log** — append-only, immutable view of every action
 
-That's it. Everything else is roadmap. See [docs/ROADMAP.md](./docs/ROADMAP.md).
-
----
-
-## Differentiation
-
-Argus is **not**:
-
-- ❌ n8n / Zapier (it doesn't run user-defined workflows)
-- ❌ AI SQL chatbot (executives never see SQL)
-- ❌ A dashboard builder (we generate insights, not charts)
-- ❌ A general LLM agent platform
-
-Argus **is**:
-
-- ✅ AI operational intelligence
-- ✅ AI investigators reasoning over events
-- ✅ Operational anomaly detection
-- ✅ Executive insight generation
-- ✅ Continuous monitoring
-
----
-
-## Open Source Strategy
-
-**Open core, source-available cloud.** The runtime, investigators, connectors, dashboard, and alerts are all OSS. Hosted cloud, RBAC, multi-tenancy, audit logs, and advanced reasoning land in a paid tier later.
-
-See [docs/OPEN_SOURCE_STRATEGY.md](./docs/OPEN_SOURCE_STRATEGY.md).
-
----
-
-## Documentation
-
-- [VISION.md](./docs/VISION.md) — what we're building and why
-- [STRATEGY.md](./docs/STRATEGY.md) — wedge, moat, GTM, 90-day MVP, risks
-- [ARCHITECTURE.md](./docs/ARCHITECTURE.md) — current v0.1 system design
-- [ARCHITECTURE_TARGET.md](./docs/ARCHITECTURE_TARGET.md) — target three-plane architecture (north star)
-- [AGENT_LOOPS.md](./docs/AGENT_LOOPS.md) — four-loop agent runtime, auto-correction, budgeting
-- [KNOWLEDGE_GRAPH.md](./docs/KNOWLEDGE_GRAPH.md) — locked decisions + scaffolding for the Living Knowledge Graph
-- [STATUS.md](./docs/STATUS.md) — current project status, what's in flight, open decisions, next step
-- [MVP_SCOPE.md](./docs/MVP_SCOPE.md) — what ships in v0.1
-- [ROADMAP.md](./docs/ROADMAP.md) — what's next
-- [INVESTIGATORS.md](./docs/INVESTIGATORS.md) — how to write an investigator
-- [CONNECTORS.md](./docs/CONNECTORS.md) — connecting data sources
-- [AI_PROVIDERS.md](./docs/AI_PROVIDERS.md) — provider abstraction
-- [EVENTS.md](./docs/EVENTS.md) — event schema and ingestion
-- [DEVELOPMENT.md](./docs/DEVELOPMENT.md) — local dev workflow
-- [CONTRIBUTING.md](./docs/CONTRIBUTING.md) — how to contribute
-- [OPEN_SOURCE_STRATEGY.md](./docs/OPEN_SOURCE_STRATEGY.md) — open core model
+These are intentional stubs — they read as "ships in M6" in the dashboard
+so a stray demo click doesn't make the live product look broken.
 
 ---
 
 ## License
 
-Apache-2.0. See [LICENSE](./LICENSE).
+AGPL-3.0 (with optional CLA for commercial relicensing). See [LICENSE](./LICENSE).
+
+If you use Argus and want to share what you built, file an issue or open a
+discussion on github.com/arnisto/qrapps-argus.
