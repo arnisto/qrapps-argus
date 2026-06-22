@@ -13,17 +13,39 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db.js';
 import { requireUser } from '../auth/middleware.js';
-import { complete, type ProviderRow } from '../llm/gemini.js';
+import { type ProviderRow } from '../llm/gemini.js';
+import { chatComplete } from '../llm/router.js';
 import { decryptKey, encryptKey } from '../llm/secret.js';
 import { resolveEnv } from './env-scope.js';
 
-const SUPPORTED = ['gemini'] as const; // M5-narrow: Gemini only.
+const SUPPORTED = ['gemini', 'groq'] as const;
 type SupportedName = (typeof SUPPORTED)[number];
+
+// Per-provider sensible defaults — used by the UI's connect form. The
+// shape mirrors what the buyer would type if they read the docs.
+export const PROVIDER_DEFAULTS: Record<
+  SupportedName,
+  { default_model: string; placeholder: string; key_help: string }
+> = {
+  gemini: {
+    default_model: 'gemini-2.5-flash',
+    placeholder: 'AIzaSy…',
+    key_help: 'Get one at aistudio.google.com — free tier is enough to demo.',
+  },
+  groq: {
+    default_model: 'llama-3.3-70b-versatile',
+    placeholder: 'gsk_…',
+    key_help: 'Get one at console.groq.com/keys — free tier has very fast inference.',
+  },
+};
 
 const CreateBody = z.object({
   name: z.enum(SUPPORTED),
   api_key: z.string().min(1).max(2000),
-  default_model: z.string().min(1).max(120).default('gemini-2.5-flash'),
+  // Default model is per-provider — caller should pass it; we leave the
+  // default empty here and fall back at write-time so we don't hard-code
+  // gemini-2.5-flash for a groq write.
+  default_model: z.string().min(1).max(120).optional(),
   base_url: z.string().url().optional(),
 });
 
@@ -100,29 +122,25 @@ export async function registerProviderRoutes(app: FastifyInstance): Promise<void
           .code(400)
           .send({ error: 'bad_request', issues: parsed.error.issues });
       }
-      const { name, api_key, default_model, base_url } = parsed.data;
+      const { name, api_key, base_url } = parsed.data;
+      const default_model = parsed.data.default_model ?? PROVIDER_DEFAULTS[name].default_model;
       const enc = encryptKey(api_key);
+      // Upsert keyed on (env_id, name) — the unique constraint added in
+      // migration 0008 makes this safe and idempotent.
       const { rows } = await db().query<{ id: string }>(
         `INSERT INTO providers (env_id, name, base_url, default_model, api_key_ct, api_key_iv)
               VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT DO NOTHING
+         ON CONFLICT (env_id, name)
+         DO UPDATE SET
+            base_url = EXCLUDED.base_url,
+            default_model = EXCLUDED.default_model,
+            api_key_ct = EXCLUDED.api_key_ct,
+            api_key_iv = EXCLUDED.api_key_iv,
+            enabled = TRUE
          RETURNING id`,
         [env.id, name, base_url ?? null, default_model, enc.ct, enc.iv],
       );
-      let id = rows[0]?.id;
-      if (!id) {
-        // Conflict path — update the existing row in-place.
-        const upd = await db().query<{ id: string }>(
-          `UPDATE providers
-              SET base_url = $3, default_model = $4,
-                  api_key_ct = $5, api_key_iv = $6, enabled = true
-            WHERE env_id = $1 AND name = $2
-            RETURNING id`,
-          [env.id, name, base_url ?? null, default_model, enc.ct, enc.iv],
-        );
-        id = upd.rows[0]?.id;
-      }
-      return reply.code(201).send({ provider: { id, name } });
+      return reply.code(201).send({ provider: { id: rows[0]!.id, name } });
     },
   );
 
@@ -146,11 +164,6 @@ export async function registerProviderRoutes(app: FastifyInstance): Promise<void
       );
       const r = rows[0];
       if (!r) return reply.code(404).send({ error: 'provider_not_found' });
-      if (r.name !== 'gemini') {
-        return reply
-          .code(400)
-          .send({ error: 'unsupported_provider', message: `Test for ${r.name} not wired yet.` });
-      }
       try {
         const p: ProviderRow = {
           name: r.name,
@@ -158,7 +171,7 @@ export async function registerProviderRoutes(app: FastifyInstance): Promise<void
           default_model: r.default_model,
           api_key: decryptKey({ ct: r.api_key_ct, iv: r.api_key_iv }),
         };
-        const resp = await complete(
+        const resp = await chatComplete(
           p,
           r.default_model,
           [{ role: 'user', content: 'Reply with exactly the two letters: OK' }],

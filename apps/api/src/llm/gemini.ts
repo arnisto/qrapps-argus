@@ -46,12 +46,14 @@ export interface ChatResponse {
     total_tokens: number;
   };
   _argus?: {
-    provider: 'gemini';
+    provider: ProviderName;
     model: string;
     latency_ms: number;
     cost_usd_estimate: number;
   };
 }
+
+export type ProviderName = 'gemini' | 'groq';
 
 // $/1M tokens. Tune as Gemini pricing moves.
 const PRICING: Record<string, { in: number; out: number }> = {

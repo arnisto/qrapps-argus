@@ -9,8 +9,9 @@
  * returning so usage / cost / latency are always logged.
  */
 import { db } from '../db.js';
-import { complete, type ChatResponse, type OpenAIMessage } from './gemini.js';
+import { type ChatResponse, type OpenAIMessage } from './gemini.js';
 import { retrieve, type RetrievedChunk } from './retrieve.js';
+import { chatComplete, providerForModel } from './router.js';
 import { loadProviderForEnv } from '../routes/providers.js';
 
 export interface GroundedRequest {
@@ -98,16 +99,32 @@ export async function runGroundedChat(
   req: GroundedRequest,
   log?: { warn: (obj: object, msg: string) => void },
 ): Promise<GroundedResponse> {
-  const provider = await loadProviderForEnv(req.envId, 'gemini');
-  if (!provider) throw new NoProviderError();
-  const model = req.model ?? provider.default_model;
+  // Embeddings ALWAYS go through Gemini — schema is vector(768) and only
+  // gemini-embedding-001 with outputDimensionality=768 fits. Without Gemini
+  // configured we can't even retrieve, so 412 either way.
+  const geminiForEmbed = await loadProviderForEnv(req.envId, 'gemini');
+  if (!geminiForEmbed) throw new NoProviderError();
+
+  // Chat provider is picked by model name: llama* / mixtral* / groq/* → Groq,
+  // gemini* → Gemini. Default model comes from the chosen chat provider's
+  // configured default_model so the env's preferred model wins.
+  const explicitModel = req.model && req.model.trim() ? req.model.trim() : null;
+  const chatProviderName = providerForModel(explicitModel ?? geminiForEmbed.default_model);
+  const chatProvider =
+    chatProviderName === 'gemini'
+      ? geminiForEmbed
+      : await loadProviderForEnv(req.envId, chatProviderName);
+  if (!chatProvider) {
+    throw new NoProviderError();
+  }
+  const model = explicitModel ?? chatProvider.default_model;
 
   const lastUser = [...req.messages].reverse().find((m) => m.role === 'user');
   const query = lastUser?.content ?? '';
 
   let chunks: RetrievedChunk[] = [];
   try {
-    chunks = await retrieve(req.envId, query, provider, 8);
+    chunks = await retrieve(req.envId, query, geminiForEmbed, 8);
   } catch (err) {
     log?.warn({ err }, 'retrieve_failed_continuing_without_context');
   }
@@ -119,7 +136,7 @@ export async function runGroundedChat(
 
   let resp: ChatResponse;
   try {
-    resp = await complete(provider, model, augmented, {
+    resp = await chatComplete(chatProvider, model, augmented, {
       temperature: req.temperature ?? 0.3,
       max_tokens: req.max_tokens ?? 4096,
     });

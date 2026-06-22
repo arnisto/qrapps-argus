@@ -5,11 +5,26 @@ import { useRouter } from 'next/navigation';
 import { Field } from '@/components/auth/Field';
 import type { ProviderRow } from '@/lib/providers-server';
 
-export function ConnectGeminiForm({
+export interface ProviderDef {
+  /** Wire name — matches the `providers.name` column. */
+  id: 'gemini' | 'groq';
+  /** UI label. */
+  label: string;
+  /** API key placeholder shown in the input. */
+  placeholder: string;
+  /** Sensible default model id. */
+  default_model: string;
+  /** One-line help below the key input. */
+  keyHelp: string;
+}
+
+export function ConnectProviderForm({
   envSlug,
+  def,
   existing,
 }: {
   envSlug: string;
+  def: ProviderDef;
   existing: ProviderRow | null;
 }) {
   const router = useRouter();
@@ -24,9 +39,9 @@ export function ConnectGeminiForm({
     setSubmitting(true);
     const f = new FormData(e.currentTarget);
     const body = {
-      name: 'gemini',
+      name: def.id,
       api_key: String(f.get('api_key') ?? '').trim(),
-      default_model: String(f.get('default_model') ?? 'gemini-2.5-flash').trim(),
+      default_model: String(f.get('default_model') ?? def.default_model).trim(),
     };
     try {
       const res = await fetch(`/be/envs/${encodeURIComponent(envSlug)}/providers`, {
@@ -56,16 +71,15 @@ export function ConnectGeminiForm({
         type="password"
         autoComplete="off"
         label={existing ? 'Rotate API key' : 'API key'}
-        placeholder="AIzaSy…"
+        placeholder={def.placeholder}
         required
-        hint="Get one at aistudio.google.com — free tier is enough to demo."
+        hint={def.keyHelp}
       />
       <Field
         name="default_model"
         label="Default model"
-        defaultValue={existing?.default_model ?? 'gemini-2.5-flash'}
+        defaultValue={existing?.default_model ?? def.default_model}
         required
-        hint="gemini-2.5-flash / -pro / -flash-lite, etc."
       />
       {error ? (
         <div className="sm:col-span-2 text-sm text-red bg-red-soft border border-red/30 rounded-md px-3 py-2">
@@ -83,7 +97,7 @@ export function ConnectGeminiForm({
           disabled={submitting}
           className="rounded-md bg-accent text-white font-semibold px-3.5 py-2 text-sm hover:opacity-90 disabled:opacity-50 transition"
         >
-          {submitting ? 'Saving…' : existing ? 'Rotate key' : 'Connect Gemini'}
+          {submitting ? 'Saving…' : existing ? 'Rotate key' : `Connect ${def.label}`}
         </button>
       </div>
     </form>
