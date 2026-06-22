@@ -1,13 +1,59 @@
-import { StubPage } from '@/components/shell/StubPage';
+import { AppLayout } from '@/components/shell/AppLayout';
+import { PageShell } from '@/components/shell/PageShell';
+import { EnvPicker, NoEnvsCard } from '@/components/app/EnvPicker';
+import { getActiveEnv } from '@/lib/active-env';
+import { listSources } from '@/lib/providers-server';
+import { UploadDropzone } from './UploadDropzone';
+import { SourceList } from './SourceList';
+
 export const dynamic = 'force-dynamic';
-export default function TeachPage() {
+
+export default async function TeachPage({
+  searchParams,
+}: {
+  searchParams: { env?: string };
+}) {
+  const active = await getActiveEnv(searchParams.env);
+
   return (
-    <StubPage
-      href="/teach"
-      title="Teach Argus"
-      subtitle="Drop files into the knowledge core or answer questions to fill gaps."
-      milestone="M5"
-      body="Two cards side-by-side: file upload (dashed dropzone, PDF / MD / TXT / HTML) and answered Q&A. Each chunk is embedded with gemini-embedding-001 (768d) and indexed into the per-env chunks table with HNSW cosine ANN."
-    />
+    <AppLayout activeEnvSlug={active?.current.slug} redirectTarget="/teach">
+      <PageShell
+        title="Teach Argus"
+        subtitle="Drop files into this environment's knowledge core. Each file is chunked, embedded, and indexed inline — your next /v1/chat call grounds on it."
+        actions={active ? <EnvPicker envs={active.all} current={active.current} /> : null}
+      >
+        {!active ? (
+          <NoEnvsCard />
+        ) : (
+          <TeachBody slug={active.current.slug} />
+        )}
+      </PageShell>
+    </AppLayout>
+  );
+}
+
+async function TeachBody({ slug }: { slug: string }) {
+  const sources = await listSources(slug);
+  return (
+    <>
+      <section className="rounded-2xl border border-border bg-surface shadow-card p-5 sm:p-6">
+        <h2 className="text-2xs font-semibold uppercase tracking-wider text-text-3 mb-3">
+          Upload a file
+        </h2>
+        <UploadDropzone envSlug={slug} />
+        <p className="text-xs text-text-3 mt-3">
+          Supported: <code className="font-mono">.md</code>,{' '}
+          <code className="font-mono">.txt</code>,{' '}
+          <code className="font-mono">.html</code>. PDF support lands next. 5 MB max.
+        </p>
+      </section>
+
+      <section className="mt-5 rounded-2xl border border-border bg-surface shadow-card p-5 sm:p-6">
+        <h2 className="text-2xs font-semibold uppercase tracking-wider text-text-3 mb-3">
+          Knowledge in this env ({sources.length} sources)
+        </h2>
+        <SourceList envSlug={slug} sources={sources} />
+      </section>
+    </>
   );
 }

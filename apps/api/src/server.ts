@@ -19,6 +19,7 @@ import { registerProviderRoutes } from './routes/providers.js';
 import { registerApiKeyRoutes } from './routes/api-keys.js';
 import { registerSourceRoutes } from './routes/sources.js';
 import { registerChatRoutes } from './routes/chat.js';
+import { registerPlaygroundRoutes } from './routes/playground.js';
 import { attachUser } from './auth/middleware.js';
 
 // Routes that are publicly callable WITHOUT the dashboard session gate.
@@ -95,6 +96,7 @@ export async function buildServer() {
   await registerApiKeyRoutes(app);
   await registerSourceRoutes(app);
   await registerChatRoutes(app);
+  await registerPlaygroundRoutes(app);
   await registerHealthRoutes(app);
   await registerEventRoutes(app);
   await registerFindingRoutes(app);
