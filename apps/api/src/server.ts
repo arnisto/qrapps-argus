@@ -23,6 +23,7 @@ import { registerPlaygroundRoutes } from './routes/playground.js';
 import { registerMemberRoutes } from './routes/members.js';
 import { registerEnvConnectorRoutes } from './routes/env-connectors.js';
 import { registerAutomationRoutes } from './routes/automations.js';
+import { startAutomationDispatcher } from './automations/dispatcher.js';
 import { attachUser } from './auth/middleware.js';
 
 // Routes that are publicly callable WITHOUT the dashboard session gate.
@@ -121,6 +122,15 @@ export async function buildServer() {
   await registerInvestigationRoutes(app);
   await registerAlertChannelRoutes(app);
   await registerLlmCredentialRoutes(app);
+
+  // Boot the automations dispatcher (BullMQ singleton + 5s Postgres-poll tick).
+  // Lives in-process for v1; advisory-lock leader election lands when we
+  // need >1 API replica. See docs/ARCHITECTURE_AUTOMATIONS.md §4.
+  try {
+    await startAutomationDispatcher(app.log);
+  } catch (err) {
+    app.log.error({ err: (err as Error).message }, 'automation_dispatcher.boot_failed');
+  }
 
   return app;
 }

@@ -66,6 +66,12 @@ const GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'Operate',
+    items: [
+      { label: 'Automations', href: '/automations', icon: IconPipelines, hint: 'cron' },
+    ],
+  },
+  {
     label: 'Knowledge',
     items: [
       { label: 'Teach Argus', href: '/teach', icon: IconTeach },
@@ -99,7 +105,8 @@ function isActive(pathname: string, href: string): boolean {
  * excluded so we don't push noise into their URLs.
  */
 const ENV_SCOPED = new Set([
-  '/models', '/teach', '/developer-api', '/ask', '/connectors', '/channels',
+  '/models', '/teach', '/developer-api', '/ask',
+  '/connectors', '/channels', '/automations',
 ]);
 
 function hrefWithEnv(href: string, activeEnvSlug?: string): string {

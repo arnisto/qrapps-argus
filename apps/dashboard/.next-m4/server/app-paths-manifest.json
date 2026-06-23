@@ -1,0 +1,7 @@
+{
+  "/environments/[slug]/page": "app/environments/[slug]/page.js",
+  "/models/page": "app/models/page.js",
+  "/members/page": "app/members/page.js",
+  "/ask/page": "app/ask/page.js",
+  "/teach/page": "app/teach/page.js"
+}

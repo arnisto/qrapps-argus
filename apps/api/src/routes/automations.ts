@@ -22,6 +22,9 @@ import { z } from 'zod';
 import { db } from '../db.js';
 import { requireUser } from '../auth/middleware.js';
 import { resolveEnv } from './env-scope.js';
+import { compileAutomation } from '../automations/compiler.js';
+import { runOnce } from '../automations/runner.js';
+import { enqueueManualRun, scheduleNextRun } from '../automations/dispatcher.js';
 
 // ---------------------------------------------------------------------------
 // Zod boundaries
@@ -281,9 +284,8 @@ export async function registerAutomationRoutes(app: FastifyInstance): Promise<vo
   );
 
   // ---- POST /envs/:slug/automations/:id/resume -----------------------------
-  // paused → active. Computing the actual next_run_at needs the schedule
-  // parser (lands with the dispatcher in M8.3). For M8.1 we just flip status
-  // and let the dispatcher compute next_run_at on its next tick.
+  // paused → active. Computes next_run_at from the schedule so the
+  // dispatcher picks it up on its next tick.
   app.post<{ Params: { slug: string; id: string } }>(
     '/envs/:slug/automations/:id/resume',
     { onRequest: [requireUser] },
@@ -293,27 +295,30 @@ export async function registerAutomationRoutes(app: FastifyInstance): Promise<vo
       const { rows } = await db().query<AutomationRow>(
         `UPDATE automations
             SET status = 'active', updated_at = now()
-          WHERE id = $1 AND env_id = $2 AND status = 'paused'
+          WHERE id = $1 AND env_id = $2 AND status IN ('paused', 'draft')
             AND schedule_cron IS NOT NULL
+            AND compiled_plan != '{}'::jsonb
       RETURNING *`,
         [req.params.id, env.id],
       );
       if (!rows[0]) {
-        return reply.code(404).send({
+        return reply.code(400).send({
           error: 'automation_not_resumeable',
           message:
-            'Automation must be paused and have a schedule before it can be resumed.',
+            'Automation must have a compiled plan and a schedule before it can be activated.',
         });
       }
-      return { automation: rows[0] };
+      const nextAt = await scheduleNextRun(req.params.id);
+      return { automation: { ...rows[0], next_run_at: nextAt?.toISOString() ?? null } };
     },
   );
 
-  // ---- POST /envs/:slug/automations/:id/preview ----------------------------
-  // 501 stub for M8.1 — needs the compiler (M8.2) + the runner (M8.3).
-  // Returns the same shape we'll fill in later so the UI can wire today.
+  // ---- POST /envs/:slug/automations/:id/compile ----------------------------
+  // Re-compile the prompt_text into a frozen plan. The result is persisted
+  // onto compiled_plan + plan_compiler_model + plan_compiled_at. The UI
+  // calls this after the operator edits the prompt OR clicks "Recompile".
   app.post<{ Params: { slug: string; id: string } }>(
-    '/envs/:slug/automations/:id/preview',
+    '/envs/:slug/automations/:id/compile',
     { onRequest: [requireUser] },
     async (req, reply) => {
       const env = await resolveEnv(req, reply, req.params.slug, true);
@@ -322,18 +327,78 @@ export async function registerAutomationRoutes(app: FastifyInstance): Promise<vo
         `SELECT * FROM automations WHERE id = $1 AND env_id = $2`,
         [req.params.id, env.id],
       );
+      const a = rows[0];
+      if (!a) return reply.code(404).send({ error: 'automation_not_found' });
+
+      let result;
+      try {
+        result = await compileAutomation(env.id, env.slug, a.prompt_text, a.schedule_tz);
+      } catch (err) {
+        return reply.code(502).send({
+          error: 'compiler_failed',
+          message: (err as Error).message,
+        });
+      }
+
+      // Persist whatever we got — even on errors so the UI can show what
+      // the operator's prompt currently compiles to. If errors are
+      // non-empty, the plan won't be set to {ok}, but stays as last good.
+      if (result.ok && result.plan) {
+        await db().query(
+          `UPDATE automations
+              SET compiled_plan = $1::jsonb,
+                  plan_compiler_model = $2,
+                  plan_compiled_at = now(),
+                  schedule_cron = COALESCE($3, schedule_cron),
+                  schedule_tz = $4,
+                  name = $5,
+                  updated_at = now()
+            WHERE id = $6 AND env_id = $7`,
+          [
+            JSON.stringify(result.plan),
+            result.compiler_model,
+            result.schedule_cron,
+            result.schedule_tz,
+            result.name,
+            req.params.id,
+            env.id,
+          ],
+        );
+      }
+      return result;
+    },
+  );
+
+  // ---- POST /envs/:slug/automations/:id/preview ----------------------------
+  // Runs the read + render steps inline, SKIPS the send step. Returns the
+  // generated text the operator would have posted. The preview run row is
+  // persisted (trigger='preview') so it shows up in run history.
+  app.post<{ Params: { slug: string; id: string } }>(
+    '/envs/:slug/automations/:id/preview',
+    { onRequest: [requireUser] },
+    async (req, reply) => {
+      const env = await resolveEnv(req, reply, req.params.slug, true);
+      if (!env) return;
+      const { rows } = await db().query<AutomationRow>(
+        `SELECT id, env_id FROM automations WHERE id = $1 AND env_id = $2`,
+        [req.params.id, env.id],
+      );
       if (!rows[0]) return reply.code(404).send({ error: 'automation_not_found' });
-      return reply.code(501).send({
-        error: 'preview_not_yet_implemented',
-        message:
-          'The compiler + runner land in M8.2 and M8.3. CRUD + UI ship in M8.1.',
-        compiled_plan: rows[0].compiled_plan,
+
+      const outcome = await runOnce(req.params.id, {
+        trigger: 'preview',
+        occurrence_ts: new Date(),
+        sendEnabled: false,
       });
+      return { outcome };
     },
   );
 
   // ---- POST /envs/:slug/automations/:id/run-now ----------------------------
-  // 501 stub for M8.1 — needs the runner (M8.3).
+  // Enqueues a manual run on the BullMQ queue and returns immediately. The
+  // run shows up in the run-history view shortly after with trigger='manual'.
+  // We don't run inline because a render step can take 10-30s; better to
+  // 202-and-poll the run-history endpoint.
   app.post<{ Params: { slug: string; id: string } }>(
     '/envs/:slug/automations/:id/run-now',
     { onRequest: [requireUser] },
@@ -341,14 +406,27 @@ export async function registerAutomationRoutes(app: FastifyInstance): Promise<vo
       const env = await resolveEnv(req, reply, req.params.slug, true);
       if (!env) return;
       const { rows } = await db().query<AutomationRow>(
-        `SELECT id FROM automations WHERE id = $1 AND env_id = $2`,
+        `SELECT id, compiled_plan FROM automations WHERE id = $1 AND env_id = $2`,
         [req.params.id, env.id],
       );
-      if (!rows[0]) return reply.code(404).send({ error: 'automation_not_found' });
-      return reply.code(501).send({
-        error: 'run_now_not_yet_implemented',
-        message: 'The runner lands in M8.3.',
-      });
+      const a = rows[0];
+      if (!a) return reply.code(404).send({ error: 'automation_not_found' });
+      const plan = a.compiled_plan as Record<string, unknown>;
+      if (!plan.read || !plan.render || !plan.send) {
+        return reply.code(400).send({
+          error: 'no_compiled_plan',
+          message: 'Compile the automation first (POST /compile).',
+        });
+      }
+      try {
+        await enqueueManualRun(req.params.id);
+        return reply.code(202).send({ ok: true });
+      } catch (err) {
+        return reply.code(503).send({
+          error: 'dispatcher_unavailable',
+          message: (err as Error).message,
+        });
+      }
     },
   );
 
