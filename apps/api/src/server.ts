@@ -22,6 +22,7 @@ import { registerChatRoutes } from './routes/chat.js';
 import { registerPlaygroundRoutes } from './routes/playground.js';
 import { registerMemberRoutes } from './routes/members.js';
 import { registerEnvConnectorRoutes } from './routes/env-connectors.js';
+import { registerAutomationRoutes } from './routes/automations.js';
 import { attachUser } from './auth/middleware.js';
 
 // Routes that are publicly callable WITHOUT the dashboard session gate.
@@ -110,6 +111,7 @@ export async function buildServer() {
   await registerPlaygroundRoutes(app);
   await registerMemberRoutes(app);
   await registerEnvConnectorRoutes(app);
+  await registerAutomationRoutes(app);
   await registerHealthRoutes(app);
   await registerEventRoutes(app);
   await registerFindingRoutes(app);
