@@ -13,6 +13,8 @@ import { type ChatResponse, type OpenAIMessage } from './gemini.js';
 import { retrieve, type RetrievedChunk } from './retrieve.js';
 import { chatComplete, providerForModel } from './router.js';
 import { loadProviderForEnv } from '../routes/providers.js';
+import { planSql, type SqlPlan } from '../agent/sql-planner.js';
+import { runQueryViaConnector, type DbQueryResult } from '../agent/db-query.js';
 
 export interface GroundedRequest {
   envId: string;
@@ -33,6 +35,18 @@ export interface GroundedResponse extends ChatResponse {
     score: number;
   }>;
   argus_warning?: 'no_grounded_context';
+  /** Tool calls Argus made during this response (today: db.query only). */
+  argus_tool_trace?: Array<{
+    tool: 'db.query';
+    connector_id: string;
+    input: string;
+    ok: boolean;
+    rows_returned?: number;
+    truncated?: boolean;
+    latency_ms?: number;
+    error?: string;
+    reason?: string;
+  }>;
 }
 
 /** Thrown when the env has no Gemini provider configured yet. */
@@ -60,6 +74,35 @@ function buildContextBlock(chunks: RetrievedChunk[]): string {
         `[#${i + 1}] ${c.source_title} (${c.source_kind}, score=${c.score})\n${c.content}`,
     )
     .join('\n\n---\n\n');
+}
+
+/**
+ * Each db_schema chunk's source.uri is `connector://<id>`. Among the
+ * chunks the model is grounding on, pick the connector that contributed
+ * the most — that's the one whose live data we should query.
+ */
+async function pickConnectorForChunks(chunks: RetrievedChunk[]): Promise<string | null> {
+  if (chunks.length === 0) return null;
+  const sourceIds = chunks.map((c) => c.source_id);
+  const { rows } = await db().query<{ uri: string }>(
+    `SELECT uri FROM sources WHERE id = ANY($1::uuid[])`,
+    [sourceIds],
+  );
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const m = /^connector:\/\/([0-9a-f-]+)$/.exec(r.uri ?? '');
+    if (!m) continue;
+    counts.set(m[1]!, (counts.get(m[1]!) ?? 0) + 1);
+  }
+  let winner: string | null = null;
+  let max = 0;
+  for (const [id, n] of counts) {
+    if (n > max) {
+      max = n;
+      winner = id;
+    }
+  }
+  return winner;
 }
 
 async function logRequest(
@@ -142,8 +185,75 @@ export async function runGroundedChat(
   const SIM_THRESHOLD = 0.6;
   const usableChunks = chunks.filter((c) => c.sim >= SIM_THRESHOLD);
 
+  // Agentic step: if any usable chunk came from a db_schema source, ask
+  // the planner whether a SELECT would help. If yes, run it READ-ONLY,
+  // inject the result rows into the grounding context. Output is logged
+  // in argus_tool_trace so the dashboard can show what SQL Argus ran.
+  const toolTrace: NonNullable<GroundedResponse['argus_tool_trace']> = [];
+  let queryResultBlock = '';
+  const dbChunks = usableChunks.filter((c) => c.source_kind === 'db_schema');
+  if (dbChunks.length > 0) {
+    // Pick the connector that contributed the most retrieved chunks.
+    const connectorId = await pickConnectorForChunks(dbChunks);
+    if (connectorId) {
+      let plan: SqlPlan;
+      try {
+        plan = await planSql(geminiForEmbed, model, query, dbChunks);
+      } catch (err) {
+        log?.warn({ err }, 'planner_failed');
+        plan = { sql: null, reason: 'planner_threw' };
+      }
+      if (plan.sql) {
+        let result: DbQueryResult;
+        try {
+          result = await runQueryViaConnector(req.envId, connectorId, plan.sql);
+        } catch (err) {
+          result = { ok: false, error: (err as Error).message };
+        }
+        toolTrace.push({
+          tool: 'db.query',
+          connector_id: connectorId,
+          input: plan.sql,
+          ok: result.ok,
+          rows_returned: result.rows_returned,
+          truncated: result.truncated,
+          latency_ms: result.latency_ms,
+          error: result.error,
+          reason: plan.reason,
+        });
+        if (result.ok) {
+          queryResultBlock = `\n\nLIVE QUERY RESULT
+----------------------------------------
+QUERY: ${plan.sql}
+ROWS RETURNED: ${result.rows_returned ?? 0}${result.truncated ? ' (truncated)' : ''}
+
+${result.rows_text}
+----------------------------------------
+When you cite this result, reference it as [query].`;
+        } else {
+          queryResultBlock = `\n\nLIVE QUERY ATTEMPTED
+----------------------------------------
+QUERY: ${plan.sql}
+ERROR: ${result.error ?? 'unknown'}
+Do not invent a result. Tell the user the query couldn't complete and why.`;
+        }
+      } else {
+        toolTrace.push({
+          tool: 'db.query',
+          connector_id: connectorId,
+          input: '',
+          ok: false,
+          reason: plan.reason,
+        });
+      }
+    }
+  }
+
   const augmented: OpenAIMessage[] = [
-    { role: 'system', content: SYSTEM_TEMPLATE(buildContextBlock(usableChunks)) },
+    {
+      role: 'system',
+      content: SYSTEM_TEMPLATE(buildContextBlock(usableChunks)) + queryResultBlock,
+    },
     ...req.messages,
   ];
 
@@ -177,6 +287,7 @@ export async function runGroundedChat(
       source_kind: c.source_kind,
       score: c.score,
     })),
+    ...(toolTrace.length > 0 ? { argus_tool_trace: toolTrace } : {}),
     ...(usableChunks.length === 0 ? { argus_warning: 'no_grounded_context' as const } : {}),
   };
 }

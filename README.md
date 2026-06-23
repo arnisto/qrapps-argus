@@ -86,34 +86,24 @@ answer points at the source.
 
 ## Quickstart
 
+**One command:**
+
 ```bash
 git clone https://github.com/arnisto/qrapps-argus.git
 cd qrapps-argus
-
-# Bring up Postgres (with pgvector) + Redis
-docker compose up -d postgres redis
-
-# Install deps and run migrations
-pnpm install
-DATABASE_URL="postgres://argus:argus@localhost:5435/argus" \
-  pnpm -F @argus/api db:migrate
-
-# Start the API on :4000
-cd apps/api
-DATABASE_URL="postgres://argus:argus@localhost:5435/argus" \
-REDIS_URL="redis://localhost:6381" \
-ARGUS_INGEST_TOKEN="dev-bearer-token" \
-pnpm dev
-
-# Start the dashboard on :3033 (separate terminal)
-cd apps/dashboard
-INTERNAL_API_URL="http://localhost:4000" pnpm next dev -p 3033
+cp .env.example .env
+docker compose up
 ```
 
-Open **http://localhost:3033**, sign up. First-time signup auto-creates a
-personal organization for you.
+This brings up Postgres (with pgvector), Redis, the API, and the
+dashboard. The API container runs migrations on startup; first boot
+takes ~30 s. When you see `api.listening` in the logs, open
+**http://localhost:3033** and sign up — the first user gets their own
+organization automatically.
 
-Full walkthrough: **[docs/GETTING_STARTED.md](./docs/GETTING_STARTED.md)**.
+To run host-side instead (for development), see
+**[docs/GETTING_STARTED.md](./docs/GETTING_STARTED.md)** for the
+`pnpm dev` setup.
 
 ---
 

@@ -25,7 +25,9 @@ services:
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
       - ./docker/postgres/migrations/0006_knowledge_graph.sql:/docker-entrypoint-initdb.d/06-knowledge-graph.sql:ro
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Host port 5435 (not 5432) so a local Postgres doesn't clash.
+      # Container-internal port is always 5432.
+      - "${POSTGRES_PORT:-5435}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-argus} -d ${POSTGRES_DB:-argus}"]
       interval: 5s
@@ -40,7 +42,8 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      # Host port 6381 (not 6379) so a local Redis doesn't clash.
+      - "${REDIS_PORT:-6381}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -86,6 +89,11 @@ services:
       retries: 5
 
   workers:
+    # Legacy v0.2 observability worker (investigators / events queue).
+    # Not used by the M7 knowledge-layer product. Hidden behind a profile
+    # so `docker compose up` doesn't try to start it; opt in with
+    # `docker compose --profile legacy up`.
+    profiles: [legacy]
     build:
       context: .
       dockerfile: docker/workers.Dockerfile
@@ -128,7 +136,8 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
       INTERNAL_API_URL: http://api:4000
     ports:
-      - "${DASHBOARD_PORT:-3000}:3000"
+      # Host port 3033 (not 3000) so other Next dev servers don't clash.
+      - "${DASHBOARD_PORT:-3033}:3000"
     depends_on:
       api:
         condition: service_started

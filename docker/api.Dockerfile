@@ -22,7 +22,12 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 FROM deps AS dev
 COPY . .
 EXPOSE 4000
-CMD ["pnpm", "--filter", "@argus/api", "dev"]
+# Run migrations on every start, then tsx-watch. The migrator only
+# applies new SQL files — first boot bootstraps every table in `public/`;
+# subsequent boots are a no-op. Doing it in the CMD (not as a separate
+# compose service) means a fresh `docker compose up` brings up a working
+# stack without anyone having to remember `pnpm db:migrate`.
+CMD ["sh", "-c", "pnpm --filter @argus/api db:migrate && pnpm --filter @argus/api dev"]
 
 # ---------- build ----------
 FROM deps AS build
