@@ -84,6 +84,37 @@ answer points at the source.
 
 ---
 
+## See it
+
+<table>
+  <tr>
+    <td><img src="./docs/screenshots/01-dashboard.png" alt="Dashboard — KPI tiles + next-step checklist" width="420"/></td>
+    <td><img src="./docs/screenshots/02-connectors.png" alt="Connectors marketplace — search, filter, connect" width="420"/></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Dashboard</b> — KPI tiles + a next-step checklist driven by real counts</sub></td>
+    <td align="center"><sub><b>Connectors marketplace</b> — search, filter by kind, click to connect</sub></td>
+  </tr>
+  <tr>
+    <td><img src="./docs/screenshots/05-models.png" alt="Models — connect Gemini + Groq, share keys across envs" width="420"/></td>
+    <td><img src="./docs/screenshots/04-teach.png" alt="Teach Argus — upload files or paste Q&A pairs" width="420"/></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Models</b> — Gemini + Groq side-by-side, one-click sharing across envs in the same org</sub></td>
+    <td align="center"><sub><b>Teach Argus</b> — drop a file or paste a Q&amp;A pair, indexed inline with citation back to source</sub></td>
+  </tr>
+  <tr>
+    <td><img src="./docs/screenshots/06-developer-api.png" alt="Developer API — mint key + curl panel" width="420"/></td>
+    <td><img src="./docs/screenshots/03-channels.png" alt="Channels marketplace — Slack adapter wired today" width="420"/></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Developer API</b> — mint a key (shown once), then paste the cURL into your terminal</sub></td>
+    <td align="center"><sub><b>Channels marketplace</b> — Slack outbound shipped, Interview loop next</sub></td>
+  </tr>
+</table>
+
+---
+
 ## Quickstart
 
 **One command:**
