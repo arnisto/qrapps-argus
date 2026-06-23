@@ -7,6 +7,127 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.5.0-rc1] — 2026-06-23 — "automations"
+
+Scheduled jobs orchestrating connectors + channels via natural-language
+prompts. Compile-at-save, generate-at-run; the SEND is never an LLM tool;
+Postgres is schedule truth, BullMQ is execution; timezone is env-level.
+
+See [`docs/ARCHITECTURE_AUTOMATIONS.md`](./docs/ARCHITECTURE_AUTOMATIONS.md)
+for the load-bearing design decisions.
+
+### Added — M8 — Automations
+
+**Schema (`docker/postgres/migrations/0010_automations.sql`)**:
+- `automations` table — definition, `compiled_plan` JSONB, schedule, cost
+  caps, status (`draft`/`active`/`paused`/`disabled`).
+- `automation_runs` table — one row per scheduled occurrence with
+  `UNIQUE(automation_id, occurrence_ts)` as the idempotency anchor across
+  Postgres + Redis + Slack double-send risk. `step_trace` JSONB mirrors the
+  `argus_tool_trace` shape from `llm/chat.ts`.
+- Partial index `automations_due_idx ON (next_run_at) WHERE status='active'`
+  — the dispatcher's hot path, O(due rows) regardless of total size.
+- Three enums (`automation_status`, `automation_run_st`, `automation_trigger`).
+
+**Compiler (`apps/api/src/automations/compiler.ts`)** — M8.2:
+- Single LLM call (Gemini Flash) turns one English sentence into a structured
+  `{name, schedule_cron, schedule_tz, plan: {read, render, send}}` plan.
+- Strict-JSON output with one re-prompt on parse failure.
+- Validation pass before persisting: connector IDs must exist in this env,
+  read connector must be `kind='db'`, send connector must be `kind='channel'`,
+  SQL must pass `isReadOnlyStatement`, cron must be parseable in the named tz.
+- Returns `{ok, plan, warnings[], errors[]}` so the UI surfaces non-fatal
+  warnings inline and blocks save on errors.
+
+**Schedule (`apps/api/src/automations/schedule.ts`)**:
+- `cron-parser` with IANA tz support; handles DST correctly through the host
+  zoneinfo. `nextRun`, `nextNRuns`, `isValidCron` helpers.
+
+**Runner (`apps/api/src/automations/runner.ts`)** — M8.3:
+- `runOnce()` orchestrates the 3-step pipeline:
+  `runQueryViaConnector` → `chatComplete` (with `{{rows}}` interpolation) →
+  channel adapter dispatch (Slack today).
+- Idempotency: `INSERT … ON CONFLICT DO NOTHING` against the `UNIQUE`
+  constraint to claim the run row; second worker for the same occurrence
+  short-circuits to `suppressed`.
+- `daily_cost_cap_usd` suppresses cron runs (computes today's spend via
+  `SUM(cost_usd)`). `per_run_token_cap` aborts at the LLM-router boundary.
+- Failure classes: `connector_permanent` counts toward `consecutive_failures`;
+  `provider_5xx` and `budget_*` do not. 5 consecutive permanent →
+  `status='paused' + next_run_at=NULL` (auto-pause).
+- Preview path (`sendEnabled=false`) runs read + render, returns the
+  generated text WITHOUT touching the channel.
+
+**Dispatcher (`apps/api/src/automations/dispatcher.ts`)**:
+- BullMQ `Queue` + `Worker` singleton booted inside the Fastify process.
+  Concurrency 50; 3 retries with exponential backoff per run; bounded
+  history via `removeOnComplete:50 / removeOnFail:200`.
+- 5s tick: `SELECT … LIMIT 500 WHERE status='active' AND next_run_at <
+  now()`. For each due row: CAS-advance `next_run_at` to `nextRun(…)`,
+  enqueue with deterministic `jobId = 'auto:<id>:<occurrence_ts>'` so a
+  crash mid-tick can't double-enqueue.
+- Boot tick fires immediately so newly-active automations don't wait 5s.
+
+**Routes (`apps/api/src/routes/automations.ts`)** — M8.1 + M8.3:
+- `GET /envs/:slug/automations` — list with lateral-join `run_count` +
+  `last_run_status` summary in one query.
+- `POST /envs/:slug/automations` — create as draft.
+- `GET|PATCH|DELETE /envs/:slug/automations/:id` — standard CRUD; PATCH on
+  `prompt_text` invalidates `compiled_plan` (forces recompile).
+- `POST /envs/:slug/automations/:id/compile` — re-runs the compiler.
+- `POST /envs/:slug/automations/:id/preview` — synchronous read + render,
+  skips send.
+- `POST /envs/:slug/automations/:id/run-now` — enqueues a manual run, 202.
+- `POST /envs/:slug/automations/:id/{pause,resume}` — status transitions;
+  resume calls `scheduleNextRun` so the dispatcher picks it up.
+- `GET /envs/:slug/automations/:id/runs` — paginated history (max 200).
+
+**UI (`apps/dashboard/src/app/automations/`)** — M8.4:
+- New `Operate` sidebar group containing `Automations` (cron hint badge),
+  between `Engine` and `Knowledge` — preserves the "wires the brain / uses
+  the brain" mental split.
+- `/automations` page (server component) wraps `AutomationsList` client
+  component with the env picker + page chrome.
+- `AutomationsList` — 4-tile fleet view (`Active` / `Failed today` /
+  `Suppressed (cost)` / `Next run`), search box, segmented filter chips
+  (All / Failing / Paused), dense list with 4px left status rails
+  (green / red / amber / grey) per the ux-lead's spec.
+- `CreateDrawer` — slide-over with name field, prompt textarea + 4
+  suggestion chips, structured cron picker (`Every {freq} at {time}` +
+  weekday/day-of-month sub-pickers), tz selector with 9 common zones,
+  raw-cron escape hatch toggle, live `cron: ... tz: ...` preview line.
+  Submits create + fires `/compile` in the background.
+
+**Verified end-to-end via Chrome MCP + curl:**
+- Navigate `/automations` → sidebar renders Operate group, fleet tiles
+  `0/0/0/—`, seeded row visible.
+- Click `+ New` → drawer opens with full form.
+- Fill (name: "Daily agent watch", prompt, daily, 08:00, Africa/Tunis) +
+  Save draft → 201, row persisted with `cron=0 8 * * *, tz=Africa/Tunis`.
+- `POST /compile` → inferred name "Daily agent count to Slack ops alerts",
+  flagged missing `{{rows}}` placeholder (warning), refused the plan due to
+  missing Slack channel connector (error) — exactly the validation contract.
+- `POST /preview` on a row with a compiled plan → `Agent count is 0.`
+  generated in 1308ms via Gemini Flash, after 12ms live `SELECT count(*)`
+  against PG. Tokens: 77. Cost: $0.000023. Full `step_trace` persisted.
+- Run history reflected inline on list reload as `last: ok · just now`.
+
+### Documentation
+- `docs/ARCHITECTURE_AUTOMATIONS.md` — long-form brief codifying the four
+  load-bearing decisions, the data model, the execution flow, failure
+  semantics, the cost-cap math, and what's explicitly out of scope for M8.
+- `docs/ROADMAP.md` — v0.5-rc1 marked shipped; M8.5 / M7.3 in-flight.
+- `docs/screenshots/09-automations.png` — captured via puppeteer at 2× DPR.
+
+### Dependencies added
+- `cron-parser@^4.9.0` to `apps/api/package.json`.
+
+### Out of scope for v0.5 (push back if proposed)
+- Multi-channel fan-out, DAG branching, non-cron triggers, inter-automation
+  dependencies, auto-recompile on schema drift. See
+  [`ARCHITECTURE_AUTOMATIONS.md §9`](./docs/ARCHITECTURE_AUTOMATIONS.md).
+
+
 ### Added — knowledge-layer release (2026-06)
 
 The product pivoted from the observability platform into a knowledge layer

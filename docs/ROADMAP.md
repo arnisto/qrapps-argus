@@ -28,17 +28,45 @@ The core product loop end-to-end.
 
 ---
 
+## ✅ Shipped — v0.5-rc1 ("automations")
+
+Scheduled jobs that read from a connector, render text via the LLM, and
+send through a channel. All driven by one natural-language prompt
+compiled at save time. See [`ARCHITECTURE_AUTOMATIONS.md`](./ARCHITECTURE_AUTOMATIONS.md)
+for the full design.
+
+- **M8.1** — `automations` + `automation_runs` schema; full Fastify CRUD;
+  partial-index `automations_due_idx` hot path; `UNIQUE(automation_id,
+  occurrence_ts)` idempotency anchor
+- **M8.2** — compiler: NL prompt → `{read, render, send}` JSON via Gemini
+  Flash, with strict-output retry and a validation layer that catches bad
+  connector refs / unsafe SQL / unparseable cron BEFORE persisting
+- **M8.3** — BullMQ dispatcher (5s tick, in-process singleton, CAS-advance)
+  + runner (orchestrates `db.query` → `chatComplete` → `slack.send`) with
+  3-step pipeline, per-run + daily cost caps, retry classes, auto-pause
+  after 5 consecutive permanent failures
+- **M8.4** — UI: `/automations` list with 4-tile fleet view + 4px status-rail
+  rows + structured cron-picker drawer with raw-cron escape hatch and live
+  `next 3 runs` preview; new `Operate` sidebar group
+
+---
+
 ## 🟡 In-flight — v0.5 ("the company brain")
 
 Pick what to prioritize in the
 [v0.5 vote thread](https://github.com/arnisto/qrapps-argus/discussions).
 
-- **M7.3** — Slack **inbound** webhook + Interview loop. The headline. Argus DMs the right teammate when a chat hits a gap, ingests their reply forever, answers the original asker.
-  *Requires a public webhook URL — `ngrok` or a deploy.*
+- **M8.5** — Automations finishing touches: detail page with run-history
+  timeline + 30-day heatmap strip, full-screen Preview modal (compiled plan
+  / generated text / mock send target), inline compile-warning chips below
+  the prompt textarea, activation flow.
+- **M7.3** — Slack **inbound** webhook + Interview loop. Argus DMs the
+  right teammate when a chat hits a gap, ingests their reply forever,
+  answers the original asker. *Requires a public webhook URL — `ngrok`
+  or a deploy.*
 - **Bulk URL ingest** — paste a Notion / Confluence / GitHub README URL, Argus fetches + chunks it (no auto-sync yet).
 - **Proactive interview** — day-one digest DMs to experts: "Reply with one answer per line; here are 5 HR questions to seed your knowledge core."
 - **Account delete + data export** — GDPR baseline (right to erasure + portability).
-- **`docker compose up` end-to-end** — fix stale api/dashboard images so `git clone && docker compose up` brings the full stack live.
 
 ---
 

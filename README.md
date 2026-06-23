@@ -111,6 +111,12 @@ answer points at the source.
     <td align="center"><sub><b>Developer API</b> — mint a key (shown once), then paste the cURL into your terminal</sub></td>
     <td align="center"><sub><b>Channels marketplace</b> — Slack outbound shipped, Interview loop next</sub></td>
   </tr>
+  <tr>
+    <td colspan="2"><img src="./docs/screenshots/09-automations.png" alt="Automations — scheduled jobs driven by natural-language prompts" width="860"/></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><sub><b>Automations</b> (v0.5-rc1) — one English sentence compiles into a frozen plan: read from a connector, summarise with citations, send through a channel. BullMQ-backed scheduler runs it forever. Per-run + daily cost caps; auto-pause on repeated failure.</sub></td>
+  </tr>
 </table>
 
 ---
