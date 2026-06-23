@@ -2,29 +2,47 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { CatalogEntry, ConnectedRow } from '@/lib/connectors-server';
+import type { CatalogEntry, ConnectedRow, ConnectorKind } from '@/lib/connectors-server';
 import { ConnectDrawer } from './ConnectDrawer';
+import { ConnectedCard } from './ConnectedCard';
 
-const KIND_LABEL: Record<string, string> = {
-  db: 'Databases',
-  channel: 'Channels',
-  doc: 'Doc sync',
-  tool: 'Agent tools',
-};
-const KIND_ORDER = ['db', 'channel', 'doc', 'tool'] as const;
-
-export function ConnectorsMarketplace({
-  envSlug,
-  catalog,
-  connected,
-}: {
+/**
+ * The shared marketplace surface. Used by both:
+ *   · /connectors  → kinds: db, doc, tool   ("knowledge sources")
+ *   · /channels    → kinds: channel         ("communication surfaces")
+ *
+ * The component is identical; the caller pre-filters the catalog by kind
+ * and supplies category-appropriate copy + filter chips.
+ */
+export interface MarketplaceProps {
   envSlug: string;
   catalog: CatalogEntry[];
   connected: ConnectedRow[];
-}) {
+  /** Filter chips shown above the grid. Pass the kind chips appropriate
+   *  to the category (e.g. for /connectors: All/Databases/Doc sync/Agent tools;
+   *  for /channels: All/Inbound/Outbound). */
+  kindFilters: Array<{ value: 'all' | string; label: string; matches: (e: CatalogEntry) => boolean }>;
+  /** Optional per-card action surfaces (e.g. "Send test message" on a Slack
+   *  connected card). Maps subtype → array of {label, handler}. */
+  cardActions?: Record<string, Array<{ label: string; tone?: 'primary' | 'secondary'; onAct: (row: ConnectedRow) => Promise<void> | void }>>;
+  /** Placeholder for the search box. */
+  searchPlaceholder: string;
+  /** Headline shown above the "Connected" block. */
+  connectedHeadline?: string;
+}
+
+export function Marketplace({
+  envSlug,
+  catalog,
+  connected,
+  kindFilters,
+  cardActions,
+  searchPlaceholder,
+  connectedHeadline = 'Connected',
+}: MarketplaceProps) {
   const router = useRouter();
   const [q, setQ] = useState('');
-  const [kind, setKind] = useState<'all' | string>('all');
+  const [filterValue, setFilterValue] = useState<'all' | string>('all');
   const [openSubtype, setOpenSubtype] = useState<string | null>(null);
 
   const connectedBySubtype = useMemo(() => {
@@ -37,10 +55,12 @@ export function ConnectorsMarketplace({
     return m;
   }, [connected]);
 
+  const active = kindFilters.find((f) => f.value === filterValue) ?? kindFilters[0]!;
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return catalog
-      .filter((c) => (kind === 'all' ? true : c.kind === kind))
+      .filter(active.matches)
       .filter((c) =>
         !term
           ? true
@@ -48,12 +68,12 @@ export function ConnectorsMarketplace({
               .toLowerCase()
               .includes(term),
       );
-  }, [catalog, q, kind]);
+  }, [catalog, active, q]);
 
   const openEntry = openSubtype ? catalog.find((c) => c.subtype === openSubtype) ?? null : null;
 
   async function onRemove(id: string, name: string) {
-    if (!confirm(`Remove ${name} and all knowledge it indexed? Cannot be undone.`)) return;
+    if (!confirm(`Remove ${name}? Any knowledge it indexed will be deleted.`)) return;
     await fetch(`/be/envs/${encodeURIComponent(envSlug)}/env-connectors/${id}`, {
       method: 'DELETE',
       credentials: 'include',
@@ -63,11 +83,11 @@ export function ConnectorsMarketplace({
 
   return (
     <div className="space-y-6">
-      {/* ─────── connected section ─────── */}
+      {/* connected section */}
       {connected.length > 0 ? (
         <section>
           <h2 className="text-2xs font-semibold uppercase tracking-wider text-text-2 mb-3">
-            Connected ({connected.length})
+            {connectedHeadline} ({connected.length})
           </h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {connected.map((c) => (
@@ -75,6 +95,7 @@ export function ConnectorsMarketplace({
                 key={c.id}
                 row={c}
                 entry={catalog.find((e) => e.subtype === c.subtype)}
+                actions={cardActions?.[c.subtype]}
                 onRemove={() => onRemove(c.id, c.name)}
               />
             ))}
@@ -82,31 +103,38 @@ export function ConnectorsMarketplace({
         </section>
       ) : null}
 
-      {/* ─────── search + filter ─────── */}
+      {/* search + filter */}
       <section>
         <div className="flex items-center gap-3 mb-4 flex-wrap">
           <input
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search connectors — postgres, slack, notion…"
+            placeholder={searchPlaceholder}
             className="flex-1 min-w-[220px] rounded-md bg-surface-2 border border-border px-3 py-2 text-sm text-text outline-none placeholder:text-text-3 focus:border-accent focus:shadow-focus transition"
           />
-          <div className="flex items-center gap-0.5 rounded-md border border-border bg-inset p-0.5">
-            <KindChip active={kind === 'all'} onClick={() => setKind('all')}>
-              All
-            </KindChip>
-            {KIND_ORDER.map((k) => (
-              <KindChip key={k} active={kind === k} onClick={() => setKind(k)}>
-                {KIND_LABEL[k]}
-              </KindChip>
+          <div className="flex items-center gap-0.5 rounded-md border border-border bg-inset p-0.5 flex-wrap">
+            {kindFilters.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setFilterValue(f.value)}
+                className={[
+                  'px-2.5 py-1 rounded-md text-xs font-semibold transition outline-none',
+                  filterValue === f.value
+                    ? 'bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.1)] text-text'
+                    : 'text-text-3 hover:text-text-2',
+                ].join(' ')}
+              >
+                {f.label}
+              </button>
             ))}
           </div>
         </div>
 
         {filtered.length === 0 ? (
           <div className="rounded-2xl border border-border bg-surface p-10 text-center text-text-3 text-sm">
-            No connectors match "{q}". Try a different term.
+            No results match "{q}". Try a different term.
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -122,7 +150,6 @@ export function ConnectorsMarketplace({
         )}
       </section>
 
-      {/* ─────── connect drawer ─────── */}
       {openEntry ? (
         <ConnectDrawer
           envSlug={envSlug}
@@ -135,31 +162,6 @@ export function ConnectorsMarketplace({
         />
       ) : null}
     </div>
-  );
-}
-
-function KindChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        'px-2.5 py-1 rounded-md text-xs font-semibold transition outline-none',
-        active
-          ? 'bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.1)] text-text'
-          : 'text-text-3 hover:text-text-2',
-      ].join(' ')}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -214,53 +216,5 @@ function CatalogCard({
   );
 }
 
-function ConnectedCard({
-  row,
-  entry,
-  onRemove,
-}: {
-  row: ConnectedRow;
-  entry: CatalogEntry | undefined;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-surface shadow-card p-4">
-      <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-md bg-inset border border-border flex items-center justify-center font-mono text-sm font-bold text-text-2">
-          {entry?.icon ?? row.subtype.slice(0, 2).toUpperCase()}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold text-text truncate">{row.name}</div>
-          <div className="font-mono text-2xs text-text-3 mt-0.5">
-            {row.subtype} · {row.source_count} sources
-          </div>
-        </div>
-        <span
-          className={[
-            'inline-flex items-center gap-1 font-mono text-2xs font-semibold px-2 py-0.5 rounded-sm',
-            row.status === 'connected'
-              ? 'text-green bg-green-soft'
-              : row.status === 'error'
-                ? 'text-red bg-red-soft'
-                : 'text-amber bg-amber-soft',
-          ].join(' ')}
-        >
-          {row.status === 'connected' && <span className="w-1.5 h-1.5 rounded-full bg-green" />}
-          {row.status}
-        </span>
-      </div>
-      {row.status_detail ? (
-        <p className="mt-3 text-xs text-text-2 leading-snug">{row.status_detail}</p>
-      ) : null}
-      <div className="mt-3 flex justify-end">
-        <button
-          type="button"
-          onClick={onRemove}
-          className="text-2xs font-semibold rounded-md text-red border border-red/40 bg-red-soft px-2.5 py-1 hover:bg-red/15 transition"
-        >
-          Remove
-        </button>
-      </div>
-    </div>
-  );
-}
+/** Re-exported so caller can type-check kind-filter predicates. */
+export type { CatalogEntry, ConnectedRow, ConnectorKind };

@@ -60,7 +60,8 @@ const GROUPS: NavGroup[] = [
     items: [
       { label: 'Environments', href: '/environments', icon: IconConnectors },
       { label: 'Models', href: '/models', icon: IconModels },
-      { label: 'Connectors', href: '/connectors', icon: IconConnectors, hint: 'M7' },
+      { label: 'Connectors', href: '/connectors', icon: IconConnectors, hint: 'in' },
+      { label: 'Channels', href: '/channels', icon: IconChannels, hint: 'out' },
       { label: 'Developer API', href: '/developer-api', icon: IconApi },
     ],
   },
@@ -97,7 +98,9 @@ function isActive(pathname: string, href: string): boolean {
  * Top-level routes that don't accept ?env= (/environments, /dashboard) are
  * excluded so we don't push noise into their URLs.
  */
-const ENV_SCOPED = new Set(['/models', '/teach', '/developer-api', '/ask', '/connectors']);
+const ENV_SCOPED = new Set([
+  '/models', '/teach', '/developer-api', '/ask', '/connectors', '/channels',
+]);
 
 function hrefWithEnv(href: string, activeEnvSlug?: string): string {
   if (!activeEnvSlug) return href;

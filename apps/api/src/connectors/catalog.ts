@@ -92,15 +92,15 @@ export const CATALOG: CatalogEntry[] = [
     name: 'Slack',
     tagline: 'Two-way chat with members. The Interview loop runs here.',
     icon: 'SL',
-    status: 'coming_soon',
-    tags: ['inbound', 'outbound', 'interview-loop'],
+    status: 'available',
+    tags: ['outbound', 'send', 'interview-loop'],
     whatItUnlocks:
-      'Staff DM the bot, get grounded answers. Knowledge gaps DM the right expert; their reply becomes a high-authority Q&A forever.',
+      'Argus can DM a teammate to ask a question and send grounded replies back. Inbound webhook (Argus listens for replies) ships in M7.3.',
     fields: [
-      { name: 'team_name', label: 'Workspace name', type: 'text', placeholder: 'Acme', required: true, bucket: 'config' },
-      { name: 'bot_token', label: 'Bot User OAuth Token', type: 'password', placeholder: 'xoxb-…', required: true, bucket: 'secret', secret: true, hint: 'From OAuth & Permissions in your Slack app config.' },
-      { name: 'signing_secret', label: 'Signing Secret', type: 'password', placeholder: '••••', required: true, bucket: 'secret', secret: true, hint: 'Used to verify event-webhook signatures.' },
-      { name: 'default_channel', label: 'Default channel', type: 'text', placeholder: '#argus-asks', bucket: 'config', hint: 'Where Argus posts when there is no obvious thread.' },
+      { name: 'team_name', label: 'Workspace name', type: 'text', placeholder: 'Acme', required: true, bucket: 'config', hint: 'Just a label — what should this connection show up as.' },
+      { name: 'bot_token', label: 'Bot User OAuth Token', type: 'password', placeholder: 'xoxb-…', required: true, bucket: 'secret', secret: true, hint: 'From OAuth & Permissions in your Slack app config. Bot scope needs at minimum chat:write.' },
+      { name: 'signing_secret', label: 'Signing Secret', type: 'password', placeholder: '••••••••', required: false, bucket: 'secret', secret: true, hint: 'Required once we wire inbound webhooks (M7.3). You can leave blank for outbound-only today.' },
+      { name: 'default_channel', label: 'Default channel', type: 'text', placeholder: '#argus-asks', bucket: 'config', hint: 'Where the Test ping lands. Defaults to the bot user if blank.' },
     ],
   },
 

@@ -25,6 +25,13 @@ import {
   type PgConfig,
   type PgSecret,
 } from '../connectors/adapters/postgres.js';
+import {
+  testConnect as slackTest,
+  sendTestMessage as slackSendTest,
+  type SlackConfig,
+  type SlackSecret,
+} from '../connectors/adapters/slack.js';
+import { decryptKey } from '../llm/secret.js';
 
 const CreateBody = z.object({
   subtype: z.string().min(1).max(40),
@@ -171,10 +178,97 @@ export async function registerEnvConnectorRoutes(app: FastifyInstance): Promise<
         });
       }
 
+      if (subtype === 'slack') {
+        const cfg = parsed.data.config as unknown as SlackConfig;
+        const sec = parsed.data.secret as unknown as SlackSecret;
+
+        // Validate the bot token via auth.test before persisting. Saves the
+        // operator from a "connected" UI for a key that doesn't auth.
+        const test = await slackTest(cfg, sec);
+        if (!test.ok) {
+          return reply.code(400).send({
+            error: 'connection_failed',
+            message: test.error ?? 'unknown',
+          });
+        }
+
+        const enc = encryptKey(JSON.stringify(parsed.data.secret));
+        const detail = `Connected to ${test.team ?? cfg.team_name} · bot ${test.user ?? '?'}`;
+
+        const { rows } = await db().query<{ id: string }>(
+          `INSERT INTO env_connectors
+                  (env_id, kind, subtype, name, config, secret_ct, secret_iv,
+                   status, status_detail, created_by)
+                  VALUES ($1, 'channel', 'slack', $2, $3, $4, $5,
+                          'connected', $6, $7)
+           ON CONFLICT (env_id, name) DO UPDATE
+              SET config = EXCLUDED.config,
+                  secret_ct = EXCLUDED.secret_ct,
+                  secret_iv = EXCLUDED.secret_iv,
+                  status = 'connected',
+                  status_detail = $6,
+                  last_synced_at = now()
+           RETURNING id`,
+          [env.id, name, parsed.data.config, enc.ct, enc.iv, detail, req.user!.id],
+        );
+        const connectorId = rows[0]!.id;
+
+        return reply.code(201).send({
+          connector: {
+            id: connectorId,
+            subtype,
+            name,
+            status: 'connected',
+            tables_indexed: 0,
+            chunks_indexed: 0,
+            errors: [],
+            test_summary: {
+              version: `Slack workspace: ${test.team ?? 'unknown'} · bot: ${test.user ?? 'unknown'}`,
+            },
+          },
+        });
+      }
+
       return reply.code(400).send({
         error: 'subtype_not_implemented',
         message: `Connector subtype '${subtype}' is in the catalog but not wired yet.`,
       });
+    },
+  );
+
+  // ---- POST /envs/:slug/env-connectors/:id/test-send -----------------------
+  // For channel-kind connectors: send a "connection test" message via the
+  // configured adapter. Confirms not just that the token is valid (that's
+  // auth.test on connect) but that the bot can actually post.
+  app.post<{ Params: { slug: string; id: string } }>(
+    '/envs/:slug/env-connectors/:id/test-send',
+    { onRequest: [requireUser] },
+    async (req, reply) => {
+      const env = await resolveEnv(req, reply, req.params.slug, true);
+      if (!env) return;
+      const { rows } = await db().query<{
+        subtype: string;
+        config: Record<string, unknown>;
+        secret_ct: Buffer;
+        secret_iv: Buffer;
+      }>(
+        `SELECT subtype, config, secret_ct, secret_iv
+           FROM env_connectors WHERE id = $1 AND env_id = $2`,
+        [req.params.id, env.id],
+      );
+      const c = rows[0];
+      if (!c) return reply.code(404).send({ error: 'connector_not_found' });
+      const secret = JSON.parse(decryptKey({ ct: c.secret_ct, iv: c.secret_iv }));
+
+      if (c.subtype === 'slack') {
+        const out = await slackSendTest(c.config as unknown as SlackConfig, secret as SlackSecret);
+        if (!out.ok) {
+          return reply.code(502).send({ ok: false, error: out.error });
+        }
+        return { ok: true, channel: out.channel, ts: out.ts };
+      }
+
+      return reply.code(400).send({ error: 'subtype_not_supported_for_test_send' });
     },
   );
 
@@ -201,7 +295,6 @@ export async function registerEnvConnectorRoutes(app: FastifyInstance): Promise<
       if (c.subtype !== 'postgres') {
         return reply.code(400).send({ error: 'subtype_not_implemented' });
       }
-      const { decryptKey } = await import('../llm/secret.js');
       const secret = JSON.parse(decryptKey({ ct: c.secret_ct, iv: c.secret_iv })) as PgSecret;
       const out = await pgCrawlSchema(env.id, c.config, secret, req.params.id, c.name, req.user!.id);
       return { ok: out.ok, tables_indexed: out.tables_indexed, errors: out.errors };
