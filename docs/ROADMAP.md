@@ -56,6 +56,17 @@ for the full design.
 Pick what to prioritize in the
 [v0.5 vote thread](https://github.com/arnisto/qrapps-argus/discussions).
 
+- **M9** — **Automation Safety**: outbound leak prevention for the M8
+  read→render→send pipeline. Spec finalized in
+  [`docs/ARCHITECTURE_AUTOMATION_SAFETY.md`](./ARCHITECTURE_AUTOMATION_SAFETY.md).
+  Three sub-pushes:
+    · **M9.1** — column classifier + SQL rewrite + `mask-sensitive` mode
+      + secret-name regex refusal + audit log + nightly output purge
+      (closes the leak surface)
+    · **M9.2** — `aggregate-only` mode + 5-tick activation checklist
+      + Privacy tab UI + EU provider (Mistral) + fail-clean region routing
+    · **M9.3** — Slack delete sweeper + Tunisia-env banner +
+      `raw-passthrough` (gated on ack) + regulator-facing audit export
 - **M8.5** — Automations finishing touches: detail page with run-history
   timeline + 30-day heatmap strip, full-screen Preview modal (compiled plan
   / generated text / mock send target), inline compile-warning chips below
