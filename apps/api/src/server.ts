@@ -24,6 +24,7 @@ import { registerMemberRoutes } from './routes/members.js';
 import { registerEnvConnectorRoutes } from './routes/env-connectors.js';
 import { registerAutomationRoutes } from './routes/automations.js';
 import { startAutomationDispatcher } from './automations/dispatcher.js';
+import { startPurger } from './automations/purge.js';
 import { attachUser } from './auth/middleware.js';
 
 // Routes that are publicly callable WITHOUT the dashboard session gate.
@@ -130,6 +131,15 @@ export async function buildServer() {
     await startAutomationDispatcher(app.log);
   } catch (err) {
     app.log.error({ err: (err as Error).message }, 'automation_dispatcher.boot_failed');
+  }
+
+  // M9.1 — nightly output_text purger. Same BullMQ infrastructure as the
+  // dispatcher. See docs/ARCHITECTURE_AUTOMATION_SAFETY.md §9 (right-to-
+  // erasure).
+  try {
+    await startPurger(app.log);
+  } catch (err) {
+    app.log.error({ err: (err as Error).message }, 'automation_purger.boot_failed');
   }
 
   return app;

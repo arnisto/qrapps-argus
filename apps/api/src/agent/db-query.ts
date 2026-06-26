@@ -18,6 +18,7 @@ import pg from 'pg';
 import { db } from '../db.js';
 import { decryptKey } from '../llm/secret.js';
 import type { PgConfig, PgSecret } from '../connectors/adapters/postgres.js';
+import { SECRET_NAME_REGEX } from '../automations/redactor/rules.js';
 
 export interface DbQueryResult {
   ok: boolean;
@@ -58,6 +59,23 @@ function rowsToText(rows: Array<Record<string, unknown>>): {
     return { text: '(query returned no rows)', returned: 0, truncated: false };
   }
   const headers = Object.keys(rows[0]!);
+
+  // M9.1 — bright-line refusal at the LAST possible point. If any header
+  // matches SECRET_NAME_REGEX, we refuse to even serialise the rows.
+  // This catches the case where the rewriter passed (e.g. raw-passthrough
+  // mode + a secret column the operator forgot to classify) OR where the
+  // SQL contained a SELECT alias that the AST didn't surface.
+  //
+  // Belt-and-braces: the rewrite step in runner.ts already refuses at
+  // compile/preflight; this is the runtime safety net.
+  for (const h of headers) {
+    if (SECRET_NAME_REGEX.test(h)) {
+      throw new Error(
+        `db-query: refusing to serialise rows — column header "${h}" matches the secret bright line (SECRET_NAME_REGEX). Classify the column or rewrite the SQL.`,
+      );
+    }
+  }
+
   const lines: string[] = [headers.join('\t')];
   let bytes = lines[0]!.length;
   let returned = 0;

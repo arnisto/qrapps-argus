@@ -25,6 +25,8 @@ import { resolveEnv } from './env-scope.js';
 import { compileAutomation } from '../automations/compiler.js';
 import { runOnce } from '../automations/runner.js';
 import { enqueueManualRun, scheduleNextRun } from '../automations/dispatcher.js';
+import { writeAudit } from '../automations/audit.js';
+import crypto from 'node:crypto';
 
 // ---------------------------------------------------------------------------
 // Zod boundaries
@@ -365,6 +367,29 @@ export async function registerAutomationRoutes(app: FastifyInstance): Promise<vo
           ],
         );
       }
+
+      // M9.1 — audit the compile attempt regardless of ok/error. Captures
+      // the plan hash + warning/error counts (no payload content).
+      const planHash = result.ok && result.plan
+        ? crypto.createHash('sha256').update(JSON.stringify(result.plan)).digest('hex')
+        : null;
+      void writeAudit({
+        event_type: 'automation.compiled',
+        org_id: env.org_id,
+        env_id: env.id,
+        actor_user_id: req.user!.id,
+        automation_id: req.params.id,
+        plan_hash: planHash,
+        provider: result.compiler_model,
+        payload: {
+          ok: result.ok,
+          warnings_count: result.warnings.length,
+          errors_count: result.errors.length,
+          // first 80 chars of each error so an operator can debug from audit
+          errors_preview: result.errors.map((e) => e.slice(0, 80)),
+        },
+      });
+
       return result;
     },
   );

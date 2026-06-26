@@ -6,19 +6,36 @@
  * Argus Console — design tokens (light default + dark via `.dark` on
  * <html>). Sourced from design/imports/argus-console.dc.html.
  * ------------------------------------------------------------------- */
+/* Display + body fonts borrowed from intigo-brain's design language —
+ * Schibsted Grotesk for headings + KPI values (tight -0.02em tracking),
+ * Hanken Grotesk for body. IBM Plex Mono stays for monospace.
+ * See docs/STATUS.md "Design pass — intigo-brain parity (M9.1.5)".
+ */
+@import url('https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
+
 :root {
   color-scheme: light;
-  --bg: #f4f2ee;
+  /* Warm-cream + terracotta — intigo-brain aesthetic. The accent swap from
+   * cool corporate blue to warm terracotta is THE single highest-impact
+   * design change (per designer survey 2026-06-26): every primary button,
+   * focus ring, "connected" pill, accent-soft tile, and sidebar active
+   * state shifts in one commit. Neutrals nudge a hair warmer to match. */
+  --bg: #f7f5f1;
   --surface: #ffffff;
-  --surface-2: #faf8f4;
-  --inset: #f0ede7;
-  --border: #e6e2d9;
-  --border-2: #d8d3c8;
-  --text: #1b1a17;
-  --text-2: #5f5c54;
-  --text-3: #928e84;
-  --accent: #2A6FDB;
-  --accent-soft: #eaf1fc;
+  --surface-2: #f3efe9;
+  --inset: #ebe6dd;
+  --border: #e3ddd2;
+  --border-2: #d3ccc0;
+  --text: #2a251f;
+  --text-2: #5e564e;
+  --text-3: #8a8580;
+  --accent: #cf6b3a;
+  --accent-hover: #bd5e2f;
+  --accent-soft: #f7e8d8;
+  --accent-text: #a35026;
+  /* Cool slate "system speaking" ink for hero panels + toasts — contrasts
+   * intentionally against the warm app palette. */
+  --panel: #2b3142;
   --green: #1f8a5b;
   --green-soft: #e6f4ec;
   --amber: #a9701a;
@@ -41,8 +58,12 @@
   --text: #edece8;
   --text-2: #a0a4ab;
   --text-3: #6c707a;
-  --accent: #6098f0;
-  --accent-soft: #16243c;
+  /* Dark-mode terracotta — lighter shade for contrast against the dark
+   * surfaces; soft becomes a deep tinted-warm-brown panel. */
+  --accent: #e08a5c;
+  --accent-hover: #ec976b;
+  --accent-soft: #3a241a;
+  --accent-text: #f0a47d;
   --green: #41b07f;
   --green-soft: #13241b;
   --amber: #d6a24a;

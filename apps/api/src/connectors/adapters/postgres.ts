@@ -37,7 +37,7 @@ export interface PgSecret {
   password: string;
 }
 
-function makeClient(cfg: PgConfig, sec: PgSecret): pg.Client {
+export function makeClient(cfg: PgConfig, sec: PgSecret): pg.Client {
   // SSL semantics:
   //   disable → no TLS attempt (only safe on a private network)
   //   prefer  → pg lib default (opportunistic TLS, verifies if used)
@@ -92,7 +92,7 @@ export async function testConnect(cfg: PgConfig, sec: PgSecret): Promise<TestRes
   }
 }
 
-function parseSchemas(allow: string | undefined): string[] {
+export function parseSchemas(allow: string | undefined): string[] {
   if (!allow || !allow.trim()) return ['public'];
   return allow
     .split(',')

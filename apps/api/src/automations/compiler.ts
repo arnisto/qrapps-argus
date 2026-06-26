@@ -33,6 +33,7 @@ import { db } from '../db.js';
 import { chatComplete } from '../llm/router.js';
 import { loadProviderForEnv } from '../routes/providers.js';
 import type { ProviderRow, OpenAIMessage } from '../llm/gemini.js';
+import { SECRET_NAME_REGEX } from './redactor/rules.js';
 
 // ---------------------------------------------------------------------------
 // Output shape
@@ -388,6 +389,17 @@ function validate(
     errors.push(
       `Generated SQL is not a single SELECT/WITH/EXPLAIN — refusing to schedule a destructive query. Got: ${sqlTemplate.slice(0, 80)}…`,
     );
+  } else {
+    // M9.1 bright-line check #1 (compile time). Bytewise refusal — catches
+    // password_hash, api_key, session_token etc. even when they hide in
+    // CTEs / subqueries / joins the AST might not surface as projections.
+    // Mode-independent: even raw-passthrough cannot bypass this.
+    const secrets = findSecretByteMatchesInSQL(sqlTemplate);
+    if (secrets.length > 0) {
+      errors.push(
+        `Refused: SQL references column(s) that match the secret bright line — ${secrets.join(', ')}. Credentials/tokens/hashes cannot be sent through Argus.`,
+      );
+    }
   }
 
   const rowCapRaw = readObj.row_cap;
@@ -477,6 +489,21 @@ function validate(
     errors: [],
     compiler_model: compilerModel,
   };
+}
+
+/**
+ * M9.1 — bright-line byte scan. Catches secret-class column names anywhere
+ * in the SQL (CTEs, subqueries, joins, function args) — not just in the
+ * top-level SELECT list. Returns the matched identifiers.
+ */
+function findSecretByteMatchesInSQL(sql: string): string[] {
+  const seen = new Set<string>();
+  const ident = /\b([a-z_][a-z0-9_]*)\b/gi;
+  for (const m of sql.matchAll(ident)) {
+    const name = m[1]!;
+    if (SECRET_NAME_REGEX.test(name)) seen.add(name);
+  }
+  return Array.from(seen);
 }
 
 function isReadOnlyStatement(sql: string): boolean {

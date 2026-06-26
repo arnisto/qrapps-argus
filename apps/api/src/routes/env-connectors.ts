@@ -22,6 +22,8 @@ import { CATALOG, catalogBySubtype } from '../connectors/catalog.js';
 import {
   crawlSchema as pgCrawlSchema,
   testConnect as pgTest,
+  makeClient as pgMakeClient,
+  parseSchemas as pgParseSchemas,
   type PgConfig,
   type PgSecret,
 } from '../connectors/adapters/postgres.js';
@@ -32,6 +34,7 @@ import {
   type SlackSecret,
 } from '../connectors/adapters/slack.js';
 import { decryptKey } from '../llm/secret.js';
+import { crawlClassifyConnector } from '../automations/redactor/classify.js';
 
 const CreateBody = z.object({
   subtype: z.string().min(1).max(40),
@@ -164,6 +167,36 @@ export async function registerEnvConnectorRoutes(app: FastifyInstance): Promise<
           );
         }
 
+        // M9.1 — classify columns immediately after the schema crawl. This
+        // populates `column_classifications` so the redactor has labels
+        // ready before the operator authors their first automation. If
+        // classification fails we don't fail the connect — the redactor
+        // falls back to runtime name-classification.
+        let classifyResult: Awaited<ReturnType<typeof crawlClassifyConnector>> | null = null;
+        if (out.ok) {
+          try {
+            const schemas = pgParseSchemas(cfg.schema_allowlist);
+            const cli = pgMakeClient(cfg, sec);
+            await cli.connect();
+            try {
+              classifyResult = await crawlClassifyConnector({
+                client: cli,
+                connectorId,
+                orgId: env.org_id,
+                schemas,
+                maxTables: 50,
+              });
+            } finally {
+              await cli.end().catch(() => {});
+            }
+          } catch (err) {
+            req.log.warn(
+              { connector_id: connectorId, err: (err as Error).message },
+              'env_connectors.classify.failed',
+            );
+          }
+        }
+
         return reply.code(201).send({
           connector: {
             id: connectorId,
@@ -174,6 +207,12 @@ export async function registerEnvConnectorRoutes(app: FastifyInstance): Promise<
             chunks_indexed: out.chunks_indexed,
             errors: out.errors,
             test_summary: test,
+            classification: classifyResult ? {
+              tables_scanned: classifyResult.tables_scanned,
+              columns_classified: classifyResult.columns_classified,
+              secrets_found: classifyResult.secrets_found,
+              pii_found: classifyResult.pii_found,
+            } : null,
           },
         });
       }

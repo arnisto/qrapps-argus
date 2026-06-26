@@ -65,9 +65,21 @@ const config: Config = {
         },
       },
       fontFamily: {
+        // intigo-brain parity: Hanken Grotesk for body (warmer + slightly
+        // tighter than Plex Sans), Schibsted Grotesk for display (headings
+        // + KPI values, -0.02em tracking). IBM Plex Sans stays as a
+        // fallback ahead of system-ui so existing pages don't visibly
+        // shift if the Google CDN is slow.
         sans: [
+          'Hanken Grotesk',
           'IBM Plex Sans',
           'IBM Plex Sans Arabic',
+          'system-ui',
+          'sans-serif',
+        ],
+        display: [
+          'Schibsted Grotesk',
+          'Hanken Grotesk',
           'system-ui',
           'sans-serif',
         ],

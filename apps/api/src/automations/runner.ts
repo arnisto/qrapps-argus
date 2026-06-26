@@ -23,6 +23,15 @@ import { decryptKey } from '../llm/secret.js';
 import type { CompiledPlan } from './compiler.js';
 import type { SlackConfig, SlackSecret } from '../connectors/adapters/slack.js';
 import { nextRun } from './schedule.js';
+import {
+  loadClassificationsForConnector,
+  maskRowsText,
+  RefusedColumnError,
+  rewriteSelectList,
+  scanOutputForSecretValues,
+  type RedactionMode,
+} from './redactor/index.js';
+import { writeAuditForAutomation } from './audit.js';
 
 interface AutomationRow {
   id: string;
@@ -36,6 +45,11 @@ interface AutomationRow {
   consecutive_failures: number;
   daily_cost_cap_usd: string;
   per_run_token_cap: number;
+  /** M9.1 — safety knobs. Default 'mask-sensitive' for any pre-existing row. */
+  redaction_mode: RedactionMode;
+  /** M9.1 — operator activation gate. Required by validateActivationGate(). */
+  acknowledged_at: string | null;
+  acknowledgements: Record<string, unknown>;
 }
 
 type RunOpts = {
@@ -62,7 +76,30 @@ export interface RunOutcome {
   step_trace: StepRecord[];
 }
 
-const RENDER_SYSTEM = `You are a concise data summariser for an internal operations channel. Be terse, lead with the most interesting trend, cite specific numbers from the data. Output ONLY the summary text — no preamble, no caveats about what you don't know.`;
+// M9.1 — per-mode system prompts.
+// The previous single RENDER_SYSTEM said "cite specific numbers from the data"
+// which actively works against safety in mask-sensitive mode (encourages the
+// model to echo placeholders verbatim). Each mode now gets its own contract.
+const RENDER_SYSTEM_BY_MODE: Record<RedactionMode, string> = {
+  'mask-sensitive': `You are summarising data that has been pre-redacted by an upstream safety layer. Placeholders like <email#1>, <phone#2>, <pii>, <quasi-id> are INTENTIONAL — they hide real values from you.
+
+RULES:
+  - DO NOT invent values to replace placeholders.
+  - DO NOT echo placeholders verbatim. Describe categorically ("one customer email was logged", "two unique users").
+  - Cite aggregate numbers (counts, sums, averages) freely.
+  - NEVER quote any string that looks like an email, phone number, name, address, IBAN, or token — even if it isn't masked.
+  - If the only interesting fact is a redacted value, say "one user matched this criterion" without naming them.
+  - Output ONLY the summary text — no preamble, no caveats about what you can't see.`,
+
+  'aggregate-only': `You are summarising aggregate data only — counts, sums, averages, distributions. The upstream safety layer has rejected any per-row identifier from this query.
+
+RULES:
+  - If you see anything that looks like a per-row identifier (specific email, name, phone), that is a bug — refuse to summarise and explicitly say "the data appears to contain unexpected per-row identifiers; refusing".
+  - Cite aggregate numbers exactly as given.
+  - Output ONLY the summary text — no preamble.`,
+
+  'raw-passthrough': `You are a concise data summariser for an internal operations channel. Be terse, lead with the most interesting trend, cite specific numbers from the data. Output ONLY the summary text — no preamble, no caveats about what you don't know.`,
+};
 
 const FALLBACK_TEMPLATE = `Summarise these rows clearly and concisely.\n\nData:\n{{rows}}`;
 
@@ -122,23 +159,81 @@ export async function runOnce(
     };
   }
 
+  // M9.1 — audit: run.started. Captures mode + trigger; no payload content.
+  void writeAuditForAutomation(automationId, {
+    event_type: 'run.started',
+    run_id: claim.runId,
+    redaction_mode: automation.redaction_mode,
+    payload: { trigger: opts.trigger, occurrence_ts: opts.occurrence_ts.toISOString() },
+  });
+
   const trace: StepRecord[] = [];
   let outcome: RunOutcome;
 
   try {
+    // M9.1 — load this connector's column classifications once for the run.
+    // The redactor needs them at both rewriteSelectList (compile of safe SQL)
+    // and maskRowsText (cell-value safety net). One DB round-trip per run.
+    const classifications = await loadClassificationsForConnector(plan.read.connector_id);
+    const mode: RedactionMode = automation.redaction_mode;
+
+    // ---- REDACTOR — SQL REWRITE ----
+    // Refuses secret-class columns, drops/replaces pii per mode.
+    let safeSql: string;
+    let rewriteSummary: { dropped: string[]; replaced: string[]; refused: string[]; changed: boolean };
+    try {
+      const rw = rewriteSelectList(plan.read.sql_template, classifications, mode);
+      safeSql = rw.sql;
+      rewriteSummary = {
+        dropped: rw.dropped,
+        replaced: rw.replaced,
+        refused: rw.refused,
+        changed: rw.changed,
+      };
+    } catch (err) {
+      if (err instanceof RefusedColumnError) {
+        trace.push({
+          kind: 'read',
+          ok: false,
+          latency_ms: 0,
+          connector_id: plan.read.connector_id,
+          sql: plan.read.sql_template,
+          refused_columns: err.refused,
+        });
+        throw new RunError(
+          'refused_column',
+          `Refused to send: column(s) classified as secret — ${err.refused.join(', ')}`,
+        );
+      }
+      throw new RunError('safety_rewrite_failed', (err as Error).message);
+    }
+
     // ---- READ ----
     const readT0 = Date.now();
     const readResult = await runQueryViaConnector(
       automation.env_id,
       plan.read.connector_id,
-      plan.read.sql_template,
+      safeSql,
     );
+
+    // ---- REDACTOR — CELL VALUE MASKING ----
+    // Catches values that slipped through SQL rewrite (aliased columns,
+    // subquery projections, free-text columns containing PII). No-op in
+    // raw-passthrough mode.
+    const mask = maskRowsText(readResult.rows_text ?? '', mode);
+
     trace.push({
       kind: 'read',
       ok: readResult.ok,
       latency_ms: Date.now() - readT0,
       connector_id: plan.read.connector_id,
-      sql: plan.read.sql_template,
+      sql_original: plan.read.sql_template,
+      sql_executed: safeSql,
+      rewrite: rewriteSummary,
+      mask: {
+        masked_counts: mask.masked_counts,
+        tokens_minted: mask.tokens_minted,
+      },
       rows_returned: readResult.rows_returned,
       truncated: readResult.truncated,
       error: readResult.error,
@@ -152,11 +247,11 @@ export async function runOnce(
     const provider = await loadProviderForRender(automation.env_id);
     const template = plan.render.user_template || FALLBACK_TEMPLATE;
     const userMessage = template.includes('{{rows}}')
-      ? template.replace(/\{\{rows\}\}/g, readResult.rows_text ?? '(no rows)')
-      : `${template}\n\nData:\n${readResult.rows_text ?? '(no rows)'}`;
+      ? template.replace(/\{\{rows\}\}/g, mask.rows_text || '(no rows)')
+      : `${template}\n\nData:\n${mask.rows_text || '(no rows)'}`;
 
     const chat = await chatComplete(provider, plan.render.model, [
-      { role: 'system', content: RENDER_SYSTEM },
+      { role: 'system', content: RENDER_SYSTEM_BY_MODE[mode] },
       { role: 'user', content: userMessage },
     ], {
       temperature: 0.2,
@@ -167,11 +262,35 @@ export async function runOnce(
     if (tokens > automation.per_run_token_cap) {
       throw new RunError('budget_per_run', `tokens used (${tokens}) exceeded per-run cap (${automation.per_run_token_cap})`);
     }
+
+    // ---- POST-RENDER LEAK SCAN ----
+    // Defence in depth: if the LLM hallucinated or echoed a token-shaped
+    // value, refuse to send. This is the load-bearing gate for the bright
+    // line — even if rewrite + mask let something through, this catches it
+    // before it reaches the channel.
+    const leakHits = scanOutputForSecretValues(summaryText);
+    if (leakHits.length > 0) {
+      trace.push({
+        kind: 'render',
+        ok: false,
+        latency_ms: Date.now() - renderT0,
+        model: plan.render.model,
+        tokens,
+        text_chars: summaryText.length,
+        leak_detected: leakHits,
+      });
+      throw new RunError(
+        'leak_detected_in_output',
+        `Post-render scan matched secret-shaped values (${leakHits.length}); refusing to send.`,
+      );
+    }
+
     trace.push({
       kind: 'render',
       ok: true,
       latency_ms: Date.now() - renderT0,
       model: plan.render.model,
+      mode,
       tokens,
       text_chars: summaryText.length,
     });
@@ -227,6 +346,29 @@ export async function runOnce(
   await persistOutcome(claim.runId, outcome);
   await advanceAutomationState(automation, outcome, opts.trigger);
 
+  // M9.1 — audit: run.completed or run.suppressed. Counts only, no content.
+  // payload omits output_text + raw rows on purpose (those purge on retention).
+  const eventType: 'run.completed' | 'run.suppressed' =
+    outcome.status === 'suppressed' ? 'run.suppressed' : 'run.completed';
+  void writeAuditForAutomation(automationId, {
+    event_type: eventType,
+    run_id: claim.runId,
+    redaction_mode: automation.redaction_mode,
+    provider: (plan.render as { model?: string }).model ?? null,
+    payload: {
+      status: outcome.status,
+      tokens_used: outcome.tokens_used ?? null,
+      cost_usd: outcome.cost_usd ?? null,
+      error_class: outcome.error_class ?? null,
+      // Counts from rewrite + mask so a regulator can prove safety ran;
+      // we never log the values themselves.
+      rewrite_dropped: countTraceField(trace, 'rewrite', 'dropped'),
+      rewrite_replaced: countTraceField(trace, 'rewrite', 'replaced'),
+      rewrite_refused: countTraceField(trace, 'rewrite', 'refused'),
+      mask_counts: extractMaskCounts(trace),
+    },
+  });
+
   return outcome;
 }
 
@@ -242,11 +384,39 @@ class RunError extends Error {
   }
 }
 
+// ---------------------------------------------------------------------------
+// M9.1 — small helpers for audit payload summarisation. They read trace
+// entries and return counts so we never log raw values in audit_events.
+// ---------------------------------------------------------------------------
+function countTraceField(
+  trace: StepRecord[],
+  kind: 'rewrite',
+  field: 'dropped' | 'replaced' | 'refused',
+): number {
+  for (const t of trace) {
+    if (kind === 'rewrite' && t.kind === 'read') {
+      const rw = (t as { rewrite?: Record<string, string[]> }).rewrite;
+      if (rw && Array.isArray(rw[field])) return rw[field].length;
+    }
+  }
+  return 0;
+}
+
+function extractMaskCounts(trace: StepRecord[]): Record<string, number> {
+  for (const t of trace) {
+    if (t.kind === 'read') {
+      const m = (t as { mask?: { masked_counts: Record<string, number> } }).mask;
+      if (m?.masked_counts) return m.masked_counts;
+    }
+  }
+  return {};
+}
+
 async function loadAutomation(id: string): Promise<AutomationRow | null> {
   const { rows } = await db().query<AutomationRow>(
     `SELECT id, env_id, name, prompt_text, compiled_plan, schedule_cron,
             schedule_tz, status, consecutive_failures, daily_cost_cap_usd,
-            per_run_token_cap
+            per_run_token_cap, redaction_mode, acknowledged_at, acknowledgements
        FROM automations WHERE id = $1`,
     [id],
   );
