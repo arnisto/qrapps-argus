@@ -405,10 +405,11 @@ def _ke_chrome(active: str, body: str, tenant: str = "default") -> str:
     # Build per-tenant URLs so nav stays within the active business.
     base = "" if tenant == "default" else f"/p/{tenant}"
     nav_items = [
-        ("teach",      f"{base}/teach",      "Teach"),
-        ("models",     f"{base}/models",     "Models"),
-        ("api",        f"{base}/api",        "Developer API"),
-        ("playground", f"{base}/playground", "Playground"),
+        ("environments", "/environments",     "Environments"),
+        ("teach",        f"{base}/teach",     "Teach"),
+        ("models",       f"{base}/models",    "Models"),
+        ("api",          f"{base}/api",       "Developer API"),
+        ("playground",   f"{base}/playground","Playground"),
     ]
     nav = " · ".join(
         f'<a href="{href}" style="color:{"#3b82f6" if active==key else "#94a3b8"};text-decoration:none;font-weight:{600 if active==key else 500};">{label}</a>'
@@ -647,6 +648,173 @@ def view_playground(prompt: str = "", model: str = "gemini-2.5-flash",
     return _ke_chrome("playground", body, tenant)
 
 
+def view_environments(flash: str | None = None):
+    """Odoo-style LIST view of every business in one table."""
+    projs = ke_projects.list_projects()
+    rows = ""
+    for p in projs:
+        base = "" if p["slug"] == "default" else f"/p/{p['slug']}"
+        cost = float(p.get("cost_usd") or 0)
+        last = (p.get("last_request_at") or "")[:16] or "—"
+        is_default = p["slug"] == "default"
+        rename_form = (
+            f'<form class=inline method=post action="/environments/rename" style="display:inline-flex;gap:4px;align-items:center">'
+            f'<input type=hidden name=slug value="{esc(p["slug"])}">'
+            f'<input name=name value="{esc(p["name"])}" style="width:140px;padding:4px 6px;font-size:12px">'
+            f'<input name=primary_model value="{esc(p["primary_model"])}" style="width:160px;padding:4px 6px;font-size:12px">'
+            f'<button class=sec style="padding:4px 8px;font-size:11px">Save</button></form>'
+        )
+        delete_form = (
+            f'<form class=inline method=post action="/environments/delete" '
+            f'onsubmit="return confirm(\'Delete {esc(p["slug"])} and ALL its sources / keys / requests? This is permanent.\')">'
+            f'<input type=hidden name=slug value="{esc(p["slug"])}">'
+            f'<button class=danger style="padding:4px 8px;font-size:11px">Delete</button></form>'
+        )
+        if is_default:
+            delete_form = '<span class=muted style="font-size:11px">protected</span>'
+        rows += (
+            f"<tr>"
+            f"<td><a href='/environments/{esc(p['slug'])}' style='color:#60a5fa;font-weight:600'>{esc(p['name'])}</a>"
+            f"<div class=muted style='font-size:11px'>slug: <code>{esc(p['slug'])}</code></div></td>"
+            f"<td>{rename_form}</td>"
+            f"<td class=r>{int(p.get('active_providers') or 0)}</td>"
+            f"<td class=r>{int(p.get('sources') or 0)} src · {int(p.get('chunks') or 0)} chunks</td>"
+            f"<td class=r>{int(p.get('active_keys') or 0)}</td>"
+            f"<td class=r>{int(p.get('requests') or 0)}</td>"
+            f"<td class=r>${cost:.4f}</td>"
+            f"<td class=muted style='font-size:11px'>{last}</td>"
+            f"<td><a class=btn href='{base}/teach' style='padding:4px 10px;font-size:11px'>Open</a> {delete_form}</td>"
+            f"</tr>"
+        )
+
+    flash_html = f'<div class=ok>{esc(flash)}</div>' if flash else ""
+    body = f"""<h1>Environments</h1>
+<p class=muted>One row per business. Each environment is fully isolated: own connected models, knowledge core, API keys, and per-project base URL <code>/p/&lt;slug&gt;/v1</code>.</p>
+{flash_html}
+
+<div class=card><h2>+ New environment</h2>
+<form method=post action="/environments/create">
+<div style="display:grid;gap:8px;grid-template-columns:1fr 1fr 1fr">
+  <label>Name <input name=name required placeholder="e.g. Acme Logistics"></label>
+  <label>Slug (optional) <input name=slug placeholder="auto from name"></label>
+  <label>Primary model <input name=primary_model required value="gemini-2.5-flash"></label>
+</div>
+<div style="margin-top:10px"><button>Create environment</button></div></form></div>
+
+<div class=card><h2>All environments ({len(projs)})</h2>
+<table>
+<tr><th>Name / slug</th><th>Rename + change model</th><th class=r>Models</th><th class=r>Knowledge</th><th class=r>Keys</th><th class=r>Reqs</th><th class=r>Cost</th><th>Last activity</th><th></th></tr>
+{rows or '<tr><td colspan=9 class=muted style="text-align:center;padding:24px">No environments yet.</td></tr>'}
+</table>
+<div class=muted style="margin-top:8px;font-size:12px">Cost is the cumulative provider spend logged on this project's <code>/v1/chat</code> calls. Click a name to drill in.</div>
+</div>"""
+    return _ke_chrome("environments", body, "default")
+
+
+def view_environment(slug: str, flash: str | None = None):
+    """Odoo-style FORM view: everything about one environment in one screen."""
+    p = ke_projects.get_by_slug(slug)
+    if not p:
+        return _ke_chrome("environments",
+                          f'<h1>Environment not found</h1><p>No project with slug <code>{esc(slug)}</code>.</p>'
+                          f'<p><a href="/environments">← all environments</a></p>',
+                          "default")
+    base = "" if slug == "default" else f"/p/{slug}"
+    api_base = f"http://localhost:8090{base}/v1"
+    providers = ke_providers.list_providers(slug)
+    keys = ke_keys.list_keys(slug)
+    sources = ke_ingest.list_sources(slug)
+    requests = ke_chat.list_requests(slug, limit=10)
+
+    prov_rows = "".join(
+        f"<tr><td><b>{esc(g['name'])}</b></td><td><code>{esc(g['default_model'])}</code></td>"
+        f"<td class=muted>{esc(g.get('base_url') or 'default endpoint')}</td>"
+        f"<td>{'<span class=pill style=\"background:#064e3b;color:#34d399\">enabled</span>' if g['enabled'] in ('t', True, 'true') else '<span class=pill style=\"background:#3a2030;color:#fca5a5\">off</span>'}</td>"
+        f"<td class=muted style='font-size:11px'>added {esc((g['created_at'] or '')[:16])}</td></tr>"
+        for g in providers
+    ) or '<tr><td colspan=5 class=muted style="text-align:center;padding:18px">No providers connected to this environment yet.</td></tr>'
+
+    key_rows = "".join(
+        f"<tr><td><b>{esc(k['name'])}</b></td><td><code>{esc(k['key_prefix'])}</code></td>"
+        f"<td class=muted>{int(k.get('rate_per_min') or 0)}/min</td>"
+        f"<td class=muted style='font-size:11px'>{esc((k['last_used_at'] or '')[:16]) or '—'}</td></tr>"
+        for k in keys
+    ) or '<tr><td colspan=4 class=muted style="text-align:center;padding:18px">No API keys minted in this environment yet.</td></tr>'
+
+    src_rows = "".join(
+        f"<tr><td><b>{esc(s['title'])}</b></td><td class=muted>{esc(s['kind'])}</td>"
+        f"<td class=muted>{int(s.get('chunks') or 0)} chunks</td>"
+        f"<td class=muted style='font-size:11px'>{esc((s['created_at'] or '')[:16])}</td></tr>"
+        for s in sources
+    ) or '<tr><td colspan=4 class=muted style="text-align:center;padding:18px">No knowledge ingested yet.</td></tr>'
+
+    req_rows = "".join(
+        f"<tr><td class=muted style='font-size:11px'>{esc((r['created_at'] or '')[:16])}</td>"
+        f"<td>{esc(r['provider'])}/{esc(r['model'])}</td>"
+        f"<td class=r>{int(r.get('total_tokens') or 0)} tok</td>"
+        f"<td class=r>{int(r.get('latency_ms') or 0)} ms</td>"
+        f"<td class=r>${float(r.get('cost_usd') or 0):.5f}</td>"
+        f"<td>{esc(r['status'])}</td></tr>"
+        for r in requests
+    ) or '<tr><td colspan=6 class=muted style="text-align:center;padding:18px">No requests yet — try the <a href="' + base + '/playground">Playground</a>.</td></tr>'
+
+    is_default = slug == "default"
+    delete_row = (
+        '<div class=muted>The default environment cannot be deleted (preserves the legacy /v1/... routes).</div>'
+        if is_default else
+        f'<form method=post action="/environments/delete" onsubmit="return confirm(\'Delete {esc(slug)} and ALL its sources / keys / requests? Permanent.\')">'
+        f'<input type=hidden name=slug value="{esc(slug)}">'
+        f'<button class=danger>Permanently delete this environment</button></form>'
+    )
+    flash_html = f'<div class=ok>{esc(flash)}</div>' if flash else ""
+
+    body = f"""<p style="margin:0 0 6px"><a href="/environments" style="color:#60a5fa;font-size:12px">← all environments</a></p>
+<h1>{esc(p['name'])} <span style="font-size:13px;color:#8b97a7">· <code>{esc(slug)}</code></span></h1>
+<p class=muted>Base URL: <code>{esc(api_base)}</code>  ·  Created {esc((p['created_at'] or '')[:16])}</p>
+{flash_html}
+
+<div class=card><h2>Settings</h2>
+<form method=post action="/environments/rename">
+<input type=hidden name=slug value="{esc(slug)}">
+<div style="display:grid;gap:8px;grid-template-columns:1fr 1fr">
+  <label>Display name <input name=name value="{esc(p['name'])}" required></label>
+  <label>Primary model <input name=primary_model value="{esc(p['primary_model'])}" required></label>
+</div>
+<div style="margin-top:10px"><button>Save changes</button></div></form>
+<div class=muted style="margin-top:6px;font-size:12px">Slug is immutable — it's baked into the URL and any keys minted under it.</div>
+</div>
+
+<div class=card><h2>Connected models ({len(providers)} real)</h2>
+<table><tr><th>Provider</th><th>Default model</th><th>Base URL</th><th></th><th></th></tr>
+{prov_rows}
+</table>
+<div class=muted style="margin-top:6px;font-size:12px">Manage these on the <a href="{base}/models">Models page for this environment</a>.</div>
+</div>
+
+<div class=card><h2>API keys ({len(keys)})</h2>
+<table><tr><th>Name</th><th>Prefix</th><th>Rate</th><th>Last used</th></tr>
+{key_rows}
+</table>
+<div class=muted style="margin-top:6px;font-size:12px">Manage on the <a href="{base}/api">Developer API page for this environment</a>.</div>
+</div>
+
+<div class=card><h2>Knowledge ({len(sources)} sources)</h2>
+<table><tr><th>Title</th><th>Kind</th><th>Chunks</th><th>Added</th></tr>
+{src_rows}
+</table>
+<div class=muted style="margin-top:6px;font-size:12px">Add more on the <a href="{base}/teach">Teach page for this environment</a>.</div>
+</div>
+
+<div class=card><h2>Recent requests</h2>
+<table><tr><th>When</th><th>Provider/model</th><th class=r>Tokens</th><th class=r>Latency</th><th class=r>Cost</th><th>Status</th></tr>
+{req_rows}
+</table>
+</div>
+
+<div class=card style="border-color:#7f1d1d"><h2 style="color:#fca5a5">Danger zone</h2>{delete_row}</div>"""
+    return _ke_chrome("environments", body, "default")
+
+
 def view_new_project():
     body = """<h1>+ New business</h1>
 <p class=muted>Each business is a fully isolated workspace: its own connected LLMs, knowledge core, API keys, and per-project URL prefix.</p>
@@ -812,6 +980,8 @@ class H(BaseHTTPRequestHandler):
         "/api":                    "_get_api",
         "/playground":             "_get_playground",
         "/projects/new":           "_get_projects_new",
+        "/environments":           "_get_environments",
+        "/environments/":          "_get_environments",
         "/v1/projects":            "_get_v1_projects",
         "/v1/sources":             "_get_v1_sources",
         "/v1/keys":                "_get_v1_keys",
@@ -829,6 +999,7 @@ class H(BaseHTTPRequestHandler):
     # one prefix is itself a prefix of another (none here today).
     _GET_PREFIX = (
         ("/v1/providers/test/", "_get_v1_provider_test"),
+        ("/environments/",      "_get_environment_form"),
     )
 
     _POST_EXACT = {
@@ -847,6 +1018,9 @@ class H(BaseHTTPRequestHandler):
         "/playground/run":       "_post_playground_run",
         "/projects/switch":      "_post_projects_switch",
         "/projects/create":      "_post_projects_create",
+        "/environments/create":  "_post_environments_create",
+        "/environments/rename":  "_post_environments_rename",
+        "/environments/delete":  "_post_environments_delete",
         "/connectors/add":       "_post_old_conn_add",
         "/connectors/toggle":    "_post_old_conn_toggle",
         "/connectors/delete":    "_post_old_conn_delete",
@@ -945,6 +1119,22 @@ class H(BaseHTTPRequestHandler):
     def _get_models(self):     self._send(view_models(self._tenant))
     def _get_playground(self): self._send(view_playground(tenant=self._tenant))
     def _get_projects_new(self): self._send(view_new_project())
+
+    def _get_environments(self):
+        qs = urllib.parse.urlparse(self.path).query
+        flash = (urllib.parse.parse_qs(qs).get("ok") or [None])[0]
+        self._send(view_environments(flash=flash))
+
+    def _get_environment_form(self, suffix: str):
+        # `suffix` here is everything after `/environments/` — including any
+        # `?ok=...` query string, since the prefix dispatcher hands us the
+        # raw path slice. Split query off the slug first.
+        path_only, _, qs = suffix.partition("?")
+        slug = path_only.strip("/").split("/", 1)[0]
+        if not slug:
+            self._send(view_environments()); return
+        flash = (urllib.parse.parse_qs(qs).get("ok") or [None])[0]
+        self._send(view_environment(slug, flash=flash))
 
     def _get_api(self):
         qs = urllib.parse.urlparse(self.path).query
@@ -1161,6 +1351,38 @@ class H(BaseHTTPRequestHandler):
         except Exception as e:
             self._send(f"could not create: {esc(e)}", 400, "text/plain"); return
         self._redirect(f"/p/{p['slug']}/teach")
+
+    def _post_environments_create(self):
+        f = self._form()
+        name = (f.get("name") or "").strip()
+        model = (f.get("primary_model") or "gemini-2.5-flash").strip()
+        if not name:
+            self._send("name required", 400, "text/plain"); return
+        try:
+            p = ke_projects.create(name, model, slug=f.get("slug") or None)
+        except Exception as e:
+            self._send(f"could not create: {esc(e)}", 400, "text/plain"); return
+        self._redirect(f"/environments/{p['slug']}?ok=" + urllib.parse.quote(f"Created {p['name']} ({p['slug']})."))
+
+    def _post_environments_rename(self):
+        f = self._form()
+        slug = (f.get("slug") or "").strip()
+        if not slug or not ke_projects.exists(slug):
+            self._send("unknown environment", 404, "text/plain"); return
+        ke_projects.rename(slug, name=f.get("name"), primary_model=f.get("primary_model"))
+        self._redirect(f"/environments/{slug}?ok=" + urllib.parse.quote("Saved."))
+
+    def _post_environments_delete(self):
+        slug = (self._form().get("slug") or "").strip()
+        if not slug:
+            self._send("slug required", 400, "text/plain"); return
+        if slug == "default":
+            self._send("cannot delete the default environment", 403, "text/plain"); return
+        try:
+            ke_projects.delete(slug)
+        except Exception as e:
+            self._send(f"could not delete: {esc(e)}", 400, "text/plain"); return
+        self._redirect("/environments?ok=" + urllib.parse.quote(f"Deleted environment '{slug}'."))
 
     # ---------- POST handlers (legacy autopilot pages under /old) ----------
     def _post_old_conn_add(self):

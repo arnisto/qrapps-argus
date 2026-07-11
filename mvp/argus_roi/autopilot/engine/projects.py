@@ -36,11 +36,33 @@ def ensure_default() -> None:
 
 
 def list_projects() -> list[dict]:
+    """One row per project. Folds in counts/cost so the list view doesn't N+1."""
     return store.pgq(
-        "SELECT id, slug, name, primary_model, created_at, "
-        "(SELECT COUNT(*) FROM autopilot.ke_source s WHERE s.tenant_id = p.slug) AS sources, "
-        "(SELECT COUNT(*) FROM autopilot.ke_apikey k WHERE k.tenant_id = p.slug AND k.enabled) AS active_keys "
-        "FROM autopilot.ke_project p ORDER BY (p.slug='default') DESC, p.id;")
+        "SELECT p.id, p.slug, p.name, p.primary_model, p.created_at, "
+        "(SELECT COUNT(*) FROM autopilot.ke_source   s WHERE s.tenant_id = p.slug) AS sources, "
+        "(SELECT COUNT(*) FROM autopilot.ke_chunk    c WHERE c.tenant_id = p.slug) AS chunks, "
+        "(SELECT COUNT(*) FROM autopilot.ke_apikey   k WHERE k.tenant_id = p.slug AND k.enabled) AS active_keys, "
+        "(SELECT COUNT(*) FROM autopilot.ke_provider g WHERE g.tenant_id = p.slug AND g.enabled) AS active_providers, "
+        "(SELECT COUNT(*) FROM autopilot.ke_request  r WHERE r.tenant_id = p.slug) AS requests, "
+        "(SELECT COALESCE(SUM(cost_usd),0) FROM autopilot.ke_request r WHERE r.tenant_id = p.slug) AS cost_usd, "
+        "(SELECT MAX(created_at) FROM autopilot.ke_request r WHERE r.tenant_id = p.slug) AS last_request_at "
+        "FROM autopilot.ke_project p "
+        "ORDER BY (p.slug='default') DESC, p.id;")
+
+
+def rename(slug: str, name: str | None = None,
+           primary_model: str | None = None) -> dict:
+    """Patch the mutable fields of a project. slug is immutable on purpose."""
+    sets = []
+    if name is not None and name.strip():
+        sets.append(f"name = {store.dq(name.strip())}")
+    if primary_model is not None and primary_model.strip():
+        sets.append(f"primary_model = {store.dq(primary_model.strip())}")
+    if not sets:
+        return get_by_slug(slug)
+    store.pg(f"UPDATE autopilot.ke_project SET {', '.join(sets)} "
+             f"WHERE slug = {store.dq(slug)};")
+    return get_by_slug(slug)
 
 
 def get_by_slug(slug: str) -> dict | None:
