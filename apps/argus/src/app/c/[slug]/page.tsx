@@ -7,6 +7,8 @@ import type { CollectionRun, Objective, Report, Signal } from '@/lib/db-types'
 import { confirmObjective, proposeAnother, runNow, setObjectiveStatus } from './actions'
 
 export const metadata = { title: 'Overview' }
+// "Run now" collects and filters inside the server action.
+export const maxDuration = 300
 
 const OK: Record<string, string> = {
   confirmed: 'Objective confirmed. Argus will collect on its schedule, or run it now below.',
@@ -39,7 +41,7 @@ export default async function Overview({
         supabase.from('reports').select('id, title, status, created_at').eq('objective_id', active.id).order('created_at', { ascending: false }).limit(3).returns<Pick<Report, 'id' | 'title' | 'status' | 'created_at'>[]>(),
         supabase.from('signals').select('*').eq('objective_id', active.id).order('created_at', { ascending: false }).limit(8).returns<Signal[]>(),
       ])
-    : [{ data: null }, { data: null }, { data: null }]
+    : ([{ data: null }, { data: null }, { data: null }] as const)
 
   const error = errorText(firstParam(sp.error))
   const ok = OK[firstParam(sp.ok) ?? '']

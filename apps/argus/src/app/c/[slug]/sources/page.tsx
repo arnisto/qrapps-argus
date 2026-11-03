@@ -119,8 +119,8 @@ export default async function SourcesPage({
 
         <Card title="Search the Ad Library">
           <p className="mb-3 text-sm text-muted">
-            Ads running in {company.country} that match these words. Works without review, but your Facebook account must have completed
-            Meta&apos;s identity confirmation.
+            Ads running in {company.country} that match these words, if Meta&apos;s Ad Library covers commercial ads in your country (outside
+            the EU it may return only political and issue ads). Your Facebook account must have completed Meta&apos;s identity confirmation.
           </p>
           <form action={addAdQuery} className="space-y-3">
             <input type="hidden" name="slug" value={slug} />

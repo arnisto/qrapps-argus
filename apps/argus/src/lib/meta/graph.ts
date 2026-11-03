@@ -65,7 +65,10 @@ export class GraphClient {
       }
       const next = page.paging?.next
       if (!next || i + 1 >= maxPages) return out
-      page = await this.get(next)
+      // Meta embeds access_token in paging URLs; drop it, the header already carries the token.
+      const nextUrl = new URL(next)
+      nextUrl.searchParams.delete('access_token')
+      page = await this.get(nextUrl.toString())
     }
   }
 }

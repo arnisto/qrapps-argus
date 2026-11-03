@@ -43,6 +43,17 @@ describe('GraphClient', () => {
     expect(items.map((i) => i.id)).toEqual(['1', '2', '3'])
     expect(calls).toBe(3)
   })
+  it('strips access_token from paging URLs (negative control for token-in-URL)', async () => {
+    const urls: string[] = []
+    const client = new GraphClient('t', async (url) => {
+      urls.push(url)
+      return json({ data: [{ id: 'x' }], paging: urls.length === 1 ? { next: 'https://graph.facebook.com/v23.0/p/posts?access_token=SECRET&after=abc' } : {} })
+    })
+    await client.paged('p/posts', {}, 3)
+    expect(urls).toHaveLength(2)
+    expect(urls[1]).not.toContain('SECRET')
+    expect(urls[1]).toContain('after=abc')
+  })
 })
 
 describe('mappers', () => {
