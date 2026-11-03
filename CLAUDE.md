@@ -1,81 +1,34 @@
-# qrapps-argus
+# qrapps-argus (v1, rebuilt 2026-11-03)
 
-**Knowledge-layer-in-front-of-any-LLM**. OpenAI-compatible
-`/v1/chat/completions` that injects citations from documents + Q&A
-pairs uploaded per env. Fastify API + Next.js dashboard + Postgres
-(pgvector) + Redis. Multi-tenant via orgs → envs.
-
-The original observability product (events / investigators / findings)
-still lives in `apps/api` + `packages/*` under legacy paths, but no
-demo flow touches it — it's parked, not removed.
+A small AI SaaS: sign in, create a company, connect Facebook, confirm the objective the AI proposes, collect,
+filter into signals, weekly report checked against its evidence. First client: Lovixa. Design: `docs/V1.md`.
+Everything before v1 was deleted; it is in git history before commit of 2026-11-03.
 
 ## Layout
 
-- `apps/api` — Fastify server, owns DB migrations under
-  `apps/api/scripts/migrate.ts`
-- `apps/dashboard` — Next.js 14 admin UI
-- `apps/workers` — BullMQ worker processes (investigations, ingest)
-- `packages/investigators` — investigator implementations
-- `packages/connectors` — data-source connectors
-  (pre-wired: `intigo-logistics-local` Postgres connector — see below)
-- `packages/ai-providers` — Gemini / OpenAI wrappers
-- `packages/events` — typed event bus
-- `packages/shared` — cross-cutting utils + Zod schemas
+- `apps/argus` — the only app. Next.js 16 (`src/proxy.ts`, not middleware), React 19, Tailwind 4, zod 4.
+  - `src/lib/ai/` — `gemini.ts` (structured JSON, `thinkingBudget=0`), `propose-objective.ts`, `filter-signals.ts`, `report.ts` (writer + deterministic `critic`)
+  - `src/lib/meta/graph.ts` — Graph API client, OAuth, posts, Ad Library. Official API only, never scraping.
+  - `src/lib/jobs/run-objective.ts` — collect, filter, report for one objective (service role)
+  - `src/app/api/jobs/run` — cron entry (Bearer `CRON_SECRET`); `src/app/api/meta/{start,callback}` — OAuth
+- `supabase/migrations/` — SQL, additive, one file per change; `supabase/tests/` — pgTAP RLS tests
 
-## Commands
+## Commands (from the repo root)
 
 | Goal | Command |
 |---|---|
 | Install | `pnpm install` |
-| Dev — full stack | `pnpm dev` (parallel: API :4000, dashboard :3000, workers) |
-| Build all | `pnpm build` |
-| Typecheck all | `pnpm typecheck` |
-| Lint all | `pnpm lint` |
-| Test all | `pnpm test` |
-| Investigator test | `pnpm investigator:test` |
-| Inspect queues | `pnpm queues:inspect` |
-| DB migrate | `pnpm db:migrate` |
-| DB seed | `pnpm db:seed` |
-| DB reset | `pnpm db:reset` **← destructive, ask first** |
-| Format | `pnpm format` / `pnpm format:check` |
+| Dev | `pnpm dev` (port 3050, main session only) |
+| Typecheck, lint, test | `pnpm typecheck`, `pnpm lint`, `pnpm test` |
+| RLS test | `supabase test db` |
 
-## Local stack (host ports)
+## Rules
 
-- Postgres (pgvector/pgvector:pg16): **5435** (compose mapping moved
-  from 5434 after a port-conflict with intigo-brain-postgres)
-- Redis: **6381**
-- Fastify API: **4000** (`pnpm -F @argus/api dev`)
-- Next.js dashboard: **3033** (`pnpm next dev -p 3033`)
-- Pre-wired observability connector: `intigo-logistics-local` (legacy —
-  see [[qrapps-argus-local-connector]]).
-
-Note the knowledge-layer stack runs host-side, NOT via docker compose
-for `api` / `dashboard` — the compose `argus-api` and `argus-dashboard`
-images can drift out of sync; stop them before running host processes
-on the same ports.
-
-## Conventions
-
-- **Imports**: `@argus/*` for workspace packages; relative for siblings.
-- **Validation**: Zod at every API boundary (Fastify route schemas use
-  `zod-to-json-schema`). Internal modules trust their inputs.
-- **Tests**: Vitest, co-located. `pnpm test` runs the full sweep via Turbo.
-- **Type safety**: strict TS; prefer `unknown` over `any` at boundaries.
-- **Database**: raw SQL migrations under `apps/api/scripts/migrations/`
-  driven by `migrate.ts`. No ORM. Use parameterised queries.
-
-## Gemini / AI-provider gotchas
-
-From `~/.claude/MEMORY.md` ([[qrapps-argus-gemini]]):
-- Free-tier model requires `thinkingBudget=0` for structured output to
-  work. Symptom of missing setting: empty response or truncated JSON.
-
-## Guardrails
-
-- **`pnpm db:reset` is destructive.** Always confirm with the user before
-  running.
-- **Never commit `.env`** — `.env.example` is the template.
-- **Docker compose up** is the integration-test path; spinning up
-  services ad-hoc tends to drift from the compose-defined topology.
-- **Workers consume BullMQ queues** — killing a worker mid-job can leave
-  a job in `active` forever. `pnpm queues:inspect` first.
+- Every table has `company_id` and RLS through `is_member()`. App code uses the session client; the service role
+  (`utils/supabase/admin.ts`) is only for the job runner and only after the caller is checked.
+- Tokens at rest: AES-256-GCM with `APP_SECRET` (required, no disk fallback). Tokens go in the `Authorization`
+  header, never in a URL.
+- Every AI call goes through `generateJson` with a zod schema; tests use `fakeGeminiFetch`, never a live call.
+- A report number must equal a number in a cited signal (`critic`). Never weaken that check to make a report pass.
+- Never read or print `.env*` values. Names live in `apps/argus/.env.example`.
+- Commit to `main`, no PRs (solo). Commit email is the repo-local one (070@).

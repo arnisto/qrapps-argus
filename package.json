@@ -1,34 +1,25 @@
 {
   "name": "argus",
-  "version": "0.1.0-dev",
+  "version": "1.0.0-dev",
   "private": true,
-  "description": "AI-native operational observability and investigation platform.",
-  "license": "Apache-2.0",
+  "description": "Argus — a small AI SaaS that watches a company's market and reports with evidence. First client: Lovixa.",
+  "license": "AGPL-3.0-only",
   "packageManager": "pnpm@9.12.0",
   "engines": {
-    "node": ">=20.10.0",
+    "node": ">=20.19.0",
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "dev": "turbo run dev --parallel",
-    "build": "turbo run build",
-    "typecheck": "turbo run typecheck",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
-    "clean": "turbo run clean && rm -rf node_modules",
-    "db:migrate": "pnpm --filter @argus/api db:migrate",
-    "db:seed": "pnpm --filter @argus/api db:seed",
-    "db:reset": "pnpm --filter @argus/api db:reset",
-    "investigator:test": "pnpm --filter @argus/investigators test:investigator",
-    "queues:inspect": "pnpm --filter @argus/workers queues:inspect",
-    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,yml,yaml}\""
+    "dev": "pnpm --filter @argus/app dev",
+    "build": "pnpm --filter @argus/app build",
+    "typecheck": "pnpm --filter @argus/app typecheck",
+    "lint": "pnpm --filter @argus/app lint",
+    "test": "pnpm --filter @argus/app test",
+    "format": "prettier --write \"apps/argus/**/*.{ts,tsx,js,json,md,css}\"",
+    "format:check": "prettier --check \"apps/argus/**/*.{ts,tsx,js,json,md,css}\""
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
     "prettier": "^3.2.5",
-    "turbo": "^2.0.0",
-    "typescript": "^5.5.0",
-    "vitest": "^2.0.0"
+    "typescript": "^5.5.0"
   }
 }

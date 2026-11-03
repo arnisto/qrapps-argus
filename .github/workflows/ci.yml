@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    paths: ['apps/argus/**', 'supabase/**', 'package.json', 'pnpm-lock.yaml', '.github/workflows/ci.yml']
   pull_request:
     branches: [main]
 
@@ -12,35 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
           version: 9
-
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'pnpm'
-
-      - name: Install
-        run: pnpm install --frozen-lockfile=false
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Lint
-        run: pnpm lint
-        continue-on-error: true   # eslint configs land in the polish PR
-
-      - name: Test
-        run: pnpm test
-
-  docker:
-    name: docker compose build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build all services
-        run: docker compose build
+      - run: pnpm install --frozen-lockfile=false
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
