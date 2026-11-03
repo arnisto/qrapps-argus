@@ -11,8 +11,19 @@ export async function signIn(formData: FormData) {
   const next = safeNext(String(formData.get('next') ?? ''))
   const supabase = await createClient()
   const { error } = await supabase.auth.signInWithPassword({ email, password })
-  if (error) redirect(`/login?error=credentials&next=${encodeURIComponent(next)}`)
+  if (error) {
+    const code = error.code === 'email_not_confirmed' ? 'not_confirmed' : 'credentials'
+    redirect(`/login?error=${code}&next=${encodeURIComponent(next)}`)
+  }
   redirect(next)
+}
+
+export async function resendConfirmation(formData: FormData) {
+  const email = String(formData.get('email') ?? '').trim()
+  const origin = (await headers()).get('origin') ?? ''
+  const supabase = await createClient()
+  await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: `${origin}/auth/callback?next=/companies` } })
+  redirect('/login?ok=check_email')
 }
 
 export async function signUp(formData: FormData) {

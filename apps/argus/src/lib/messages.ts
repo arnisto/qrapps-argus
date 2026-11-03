@@ -1,6 +1,7 @@
 /** Error and notice codes passed through `?error=` / `?ok=` after a redirect. One place for the copy. */
 export const ERRORS: Record<string, string> = {
   credentials: 'Wrong email or password.',
+  not_confirmed: 'This email is not confirmed yet. Click the link Supabase sent you, or send a new one below.',
   link: 'That sign-in link is invalid or expired.',
   signup: 'Could not create the account. Try another email or a longer password.',
   company_name: 'The company name needs 2 to 80 characters.',

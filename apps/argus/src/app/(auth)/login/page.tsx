@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Field, Flash } from '@/components/ui'
 import { SubmitButton } from '@/components/SubmitButton'
 import { errorText, firstParam } from '@/lib/messages'
-import { signIn } from '../actions'
+import { resendConfirmation, signIn } from '../actions'
 
 export const metadata = { title: 'Sign in' }
 
@@ -14,6 +14,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <>
       <h1 className="text-2xl font-semibold">Sign in</h1>
       {error && <Flash tone="bad">{error}</Flash>}
+      {firstParam(sp.error) === 'not_confirmed' && (
+        <form action={resendConfirmation} className="space-y-3 rounded-md border border-line bg-white p-4">
+          <Field label="Email to confirm" name="email" type="email" autoComplete="email" required />
+          <SubmitButton variant="secondary" pendingLabel="Sending…">
+            Send the confirmation link again
+          </SubmitButton>
+        </form>
+      )}
       {ok === 'check_email' && <Flash tone="info">Check your inbox and click the confirmation link, then sign in.</Flash>}
       <form action={signIn} className="space-y-4">
         <input type="hidden" name="next" value={firstParam(sp.next) ?? ''} />
