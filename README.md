@@ -20,7 +20,8 @@ three AI steps, Vercel Cron for the daily run. One app: `apps/argus`. Schema: `s
 ```bash
 pnpm install
 cp apps/argus/.env.example apps/argus/.env.local   # fill the values
-# apply supabase/migrations/20261103000001_init.sql to your Supabase project (SQL editor or `supabase db push`)
+# apply the migration (the db.<ref> host is IPv6-only; use the session pooler URL from the dashboard):
+# psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 --single-transaction -f supabase/migrations/20261103000001_init.sql
 pnpm dev                                            # http://localhost:3050
 ```
 
