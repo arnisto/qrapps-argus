@@ -42,3 +42,6 @@ docker/data/
 
 # Per-user Claude Code overrides (not committed)
 .claude/settings.local.json
+
+# Supabase CLI scratch
+supabase/.temp/
